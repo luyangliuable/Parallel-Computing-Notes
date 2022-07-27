@@ -43,6 +43,13 @@
         - [Count line number](#count-line-number)
     - [List the command-line for search all files with an extension .html on the system.](#list-the-command-line-for-search-all-files-with-an-extension-html-on-the-system)
     - [Create a simple shell script for listing the contents of your directory and make it executable. List the script and the command-line for changing it into an executable file.](#create-a-simple-shell-script-for-listing-the-contents-of-your-directory-and-make-it-executable-list-the-script-and-the-command-line-for-changing-it-into-an-executable-file)
+    - [Networking](#networking)
+        - [Using ifconfig list the following networking parameters for eth0](#using-ifconfig-list-the-following-networking-parameters-for-eth0)
+            - [IP Address](#ip-address)
+            - [Hardware Address](#hardware-address)
+            - [NetMask](#netmask)
+        - [What is the purpose of /etc/hosts file?](#what-is-the-purpose-of-etchosts-file)
+        - [What is the purpose of /etc/resolv.conf file?](#what-is-the-purpose-of-etcresolvconf-file)
 
 <!-- markdown-toc end -->
 
@@ -347,10 +354,50 @@ chmod u+x test.sh
 
 
 ### Using ifconfig list the following networking parameters for eth0
-#### IP Address 
-```shell
-ipconfig getifaddr en0
+```
+lo: flags=73<UP,LOOPBACK,RUNNING>  mtu 65536
+        inet 127.0.0.1  netmask 255.0.0.0
+        inet6 ::1  prefixlen 128  scopeid 0x10<host>
+        loop  txqueuelen 1000  (Local Loopback)
+        RX packets 603  bytes 152754 (152.7 KB)
+        RX errors 0  dropped 0  overruns 0  frame 0
+        TX packets 603  bytes 152754 (152.7 KB)
+        TX errors 0  dropped 0 overruns 0  carrier 0  collisions 0
+
+wlp59s0: flags=4163<UP,BROADCAST,RUNNING,MULTICAST>  mtu 1500
+        inet 49.127.154.218  netmask 255.255.224.0  broadcast 49.127.159.255
+        inet6 fe80::cd19:b6c1:3beb:30b  prefixlen 64  scopeid 0x20<link>
+        ether a4:34:d9:28:59:0b  txqueuelen 1000  (Ethernet)
+        RX packets 103004  bytes 146184742 (146.1 MB)
+        RX errors 0  dropped 2  overruns 0  frame 0
+        TX packets 33272  bytes 4136762 (4.1 MB)
+        TX errors 0  dropped 0 overruns 0  carrier 0  collisions 0
 ```
 
-#### Hardware Address
+#### IP Address 
+* 49.127.154.218
 
+
+#### Hardware Address
+* fe80::cd19:b6c1:3beb:30b
+
+#### NetMask
+* 255.255.224.0
+
+### What is the purpose of /etc/hosts file?
+    It basically maps the hostnames to the ip address. It is used to map the a connection domain names and ip address when going accessing the domain name servers. It helps with translating human-friendly hostnames into numeric protocols.
+
+### What is the purpose of /etc/resolv.conf file?
+The file's purpose to list all the configured search domains.
+
+
+### Using NetStat display the routing table in the numeric format. List the command line and default route
+
+```shell
+netstat -n
+```
+
+* Show Kernel routing function
+```shell
+netstat -n -r
+```
