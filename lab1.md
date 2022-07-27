@@ -17,6 +17,7 @@
         - [To see groups a user is part of](#to-see-groups-a-user-is-part-of)
         - [To create a user with a unique ID](#to-create-a-user-with-a-unique-id)
         - [Creating a User with an Expiry Date](#creating-a-user-with-an-expiry-date)
+        - [List all users in the system](#list-all-users-in-the-system)
         - [Owner read only file](#owner-read-only-file)
         - [Owner read only home directory](#owner-read-only-home-directory)
         - [Owner write permission enable](#owner-write-permission-enable)
@@ -50,6 +51,7 @@
             - [NetMask](#netmask)
         - [What is the purpose of /etc/hosts file?](#what-is-the-purpose-of-etchosts-file)
         - [What is the purpose of /etc/resolv.conf file?](#what-is-the-purpose-of-etcresolvconf-file)
+        - [Using NetStat display the routing table in the numeric format. List the command line and default route](#using-netstat-display-the-routing-table-in-the-numeric-format-list-the-command-line-and-default-route)
 
 <!-- markdown-toc end -->
 
@@ -117,7 +119,7 @@ b. List the command-line for creating a zero-length file.
 touch filename
 ```
 
-Or if using vim of nano to start editing new file.
+Or if using vim or nano to start editing new file.
 
 ```shell
 nano filename
@@ -134,6 +136,12 @@ a. Create a user account for yourself and assign it to a unique group. List the 
 ### To add a new user
 ```shell
 useradd [OPTIONS] USERNAME
+```
+
+
+### To add a new group
+```shell
+groupadd [OPTIONS] GROUPNAME
 ```
 
 ### To assignment password for new user
@@ -172,6 +180,11 @@ id -u username
 ```shell
 sudo useradd -e 2019-01-22 username
 sudo chage -l username # Vertify expiry date
+```
+
+### List all users in the system
+```shell
+getent passwd | grep user
 ```
 
 Set the permissions for your home directory such that no one besides yourself can
@@ -230,14 +243,14 @@ Read or r is represented by 4,
 Write or w is represented by 2
 Execute x is represented by 1.
 
-d (directory)
-c (character device)
-l (symlink)
-p (named pipe)
-s (socket)
-b (block device)
-D (door)
-- (regular file)
+d (directory) <br />
+c (character device)  <br />
+l (symlink) <br />
+p (named pipe) <br />
+s (socket) <br />
+b (block device) <br />
+D (door) <br />
+- (regular file) <br />
 
 
 e.g. -rw-r--r--@
