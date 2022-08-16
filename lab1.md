@@ -353,4 +353,3 @@ ipconfig getifaddr en0
 ```
 
 #### Hardware Address
-
