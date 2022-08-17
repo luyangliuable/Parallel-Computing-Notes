@@ -9,7 +9,11 @@
 
 int main() {
   int size;
+
   struct timespec start, end, startComp, endComp;
+
+  clock_gettime(CLOCK_MONOTONIC, &start);
+
   printf("Please enter size of the number of threads to run with:\n");
   scanf("%i", &size);
 
@@ -24,9 +28,9 @@ int main() {
 
   printf("Start parallel processing\n");
 
-  clock_gettime(CLOCK_MONOTONIC, &start);
+  clock_gettime(CLOCK_MONOTONIC, &startComp);
 
-#pragma omp parallel for private(size) schedule(static, 4)
+#pragma omp parallel for private(size)
   for (int i = 0; i <= size; ++i) {
 
     *arr_ptr = rand() % 10;
@@ -34,9 +38,13 @@ int main() {
     arr_ptr++;
   }
 
-  clock_gettime(CLOCK_MONOTONIC, &end);
+  clock_gettime(CLOCK_MONOTONIC, &endComp);
 
-  printf("Done, time take is %ld.\n", start.tv_sec  - end.tv_sec);
+  double time_taken;
+  time_taken = (endComp.tv_sec - startComp.tv_sec) * 1e9;
+  time_taken = (time_taken + (endComp.tv_nsec - startComp.tv_nsec)) * 1e-9;
+
+  printf("Done, time take is %lf.\n", time_taken);
 
   arr_ptr = &rand_int[0];
 
@@ -53,6 +61,8 @@ int main() {
     arr_ptr++;
     /* free(res); */
   }
+
+  clock_gettime(CLOCK_MONOTONIC, &end);
 
   close(fd);
 
