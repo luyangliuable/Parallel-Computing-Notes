@@ -29,15 +29,14 @@ int task1() {
 
   FILE *fd = fopen("display.txt", "w");
 
+  // Get current clock time.
+  clock_gettime(CLOCK_MONOTONIC, &startComp);
 
 #pragma omp parallel
   {
     /***************************************************************************/
     /*         Start parallel processing for generating random integer */
     /***************************************************************************/
-
-    // Get current clock time.
-    clock_gettime(CLOCK_MONOTONIC, &startComp);
 
     printf("Start parallel processing\n");
 
@@ -65,9 +64,9 @@ int task1() {
   // Get the clock current time again
   // Subtract end from start to get the CPU time used.
   clock_gettime(CLOCK_MONOTONIC, &endComp);
-  long time_taken = (endComp.tv_sec - startComp.tv_sec) * 1e9;
+  double time_taken = (endComp.tv_sec - startComp.tv_sec) * 1e9;
   time_taken = (time_taken + (endComp.tv_nsec - startComp.tv_nsec)) * 1e-9;
-  printf("Cell product complete - Computational time only(s): %lf\n", time_taken); // portion of the computing time of ts
+  printf("Computational time only(s): %lf\n", time_taken); // portion of the computing time of ts
 
   // Get the clock current time again
   // Subtract end from start to get the CPU time used.
@@ -86,7 +85,7 @@ int main() {
 
   task1();
 
-  printf("Start task 2");
+  printf("Start task 2\n");
 
   FILE *fp;
   int i;
