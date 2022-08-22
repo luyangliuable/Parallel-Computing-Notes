@@ -12,6 +12,9 @@ int task1() {
   int threads = 4;
   struct timespec start, end, startComp, endComp;
 
+  // Get current clock time.
+	clock_gettime(CLOCK_MONOTONIC, &start);
+
   /***************************************************************************/
   /*                          Prompt user for inputs */
   /***************************************************************************/
@@ -26,11 +29,16 @@ int task1() {
 
   FILE *fd = fopen("display.txt", "w");
 
+
 #pragma omp parallel
   {
     /***************************************************************************/
     /*         Start parallel processing for generating random integer */
     /***************************************************************************/
+
+    // Get current clock time.
+    clock_gettime(CLOCK_MONOTONIC, &startComp);
+
     printf("Start parallel processing\n");
 
     int i, random_int;
@@ -50,11 +58,27 @@ int task1() {
       }
     }
 
-    fclose(fd);
   }
+
+  fclose(fd);
+
+  // Get the clock current time again
+  // Subtract end from start to get the CPU time used.
+  clock_gettime(CLOCK_MONOTONIC, &endComp);
+  long time_taken = (endComp.tv_sec - startComp.tv_sec) * 1e9;
+  time_taken = (time_taken + (endComp.tv_nsec - startComp.tv_nsec)) * 1e-9;
+  printf("Cell product complete - Computational time only(s): %lf\n", time_taken); // portion of the computing time of ts
+
+  // Get the clock current time again
+  // Subtract end from start to get the CPU time used.
+  clock_gettime(CLOCK_MONOTONIC, &end);
+  time_taken = (end.tv_sec - start.tv_sec) * 1e9;
+  time_taken = (time_taken + (end.tv_nsec - start.tv_nsec)) * 1e-9;
+  printf("Overall time (Including read, product and write)(s): %lf\n", time_taken);	// ts
 
   /* free(rand_int); */
   // exit(0);
+  return 0;
 }
 
 int main() {
@@ -110,7 +134,7 @@ int main() {
     for (int i = sp; i < ep; i++) {
 #pragma omp critical
       digits[numbers[i]] += 1;
-      printf("Found: %d", numbers[i]);
+      /* printf("Found: %d", numbers[i]); */
     }
   }
   // check occurrences for wins
