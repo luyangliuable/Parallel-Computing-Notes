@@ -44,7 +44,7 @@ int task1() {
 
     /* #pragma omp barrier */
 
-#pragma omp for
+#pragma omp for schedule(dynamic, 1)
     for (i = 0; i < size; i++) {
       /* Generate random number *
        * ************************************************/
