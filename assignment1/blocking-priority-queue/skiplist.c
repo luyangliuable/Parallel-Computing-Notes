@@ -1,4 +1,5 @@
 /* Skip Lists: A Probabilistic Alternative to Balanced Trees */
+#include "../timer.c";
 #include <stdbool.h>
 #include <unistd.h>
 
@@ -174,11 +175,19 @@ int main() {
     skiplist_insert(&list, arr[i], arr[i]);
   }
 
+  /* Remove 2 and insert 4 at the same time */
+  struct timespec start, end, startComp, endComp;
+  clock_gettime(CLOCK_MONOTONIC, &startComp);
   snode *x = DeleteMin(&list);
   /* snode *y = skiplist_search(&list, 2); */
-  skiplist_delete(&list, 2);
+  DeleteMin(&list);
+  /* skiplist_delete(&list, 2); */
+  /* skiplist_delete(&list, 2); */
   printf("key = %d, value = %d\n", x->key, x->value);
 
+  clock_gettime(CLOCK_MONOTONIC, &endComp);
+  double ans  = get_time_taken(endComp, startComp);
+  printf("%lf\n", ans);
   skiplist_dump(&list);
 
   /* skiplist_dump(&list); */

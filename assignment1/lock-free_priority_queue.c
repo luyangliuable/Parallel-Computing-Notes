@@ -11,6 +11,23 @@ struct Node *head, *tail;
 // Can be any value to link the values for each node
 int MAXLEVEL = 1;
 
+struct Node *MALLOC_NODE() {
+  return malloc(sizeof(struct Node));
+}
+
+struct Node *READ_NODE(union Link *address) {
+  if (address->d)
+    return NULL;
+
+  return address->p;
+}
+
+struct Node *COPY_NODE(struct Node *node) {
+  return node;
+}
+
+void RELEASE_NODE(struct Node *node) { return; }
+
 struct Node *CreateNode(int level, int key, void *value) {
 
   /***************************************************************************/
@@ -44,6 +61,7 @@ static int rand_level() {
   return level;
 }
 
+
 struct Node *ReadNext(struct Node **node1, int level) {
   printf("read next\n");
   // Local variables (for all functions/procedures)
@@ -60,6 +78,7 @@ struct Node *ReadNext(struct Node **node1, int level) {
   }
   return node2;
 }
+
 
 struct Node *ScanKey(struct Node **node1, int level, int key) {
   printf("scankey\n");
@@ -129,7 +148,6 @@ bool Insert(int key, void *value) {
       RELEASE_NODE(node1);
       break;
     }
-    // Back-Off
   }
 
   for (i = 1; i <= level - 1; i++) {
@@ -149,7 +167,6 @@ bool Insert(int key, void *value) {
         RELEASE_NODE(node1);
         break;
       }
-      // Back-Off
     }
   }
 
@@ -363,20 +380,3 @@ int main(void) {
     exit(0);
     /* return 0; */
   }
-
-struct Node *MALLOC_NODE() {
-  return malloc(sizeof(struct Node));
-}
-
-struct Node *READ_NODE(union Link *address) {
-  if (address->d)
-    return NULL;
-
-  return address->p;
-}
-
-struct Node *COPY_NODE(struct Node *node) {
-  return node;
-}
-
-void RELEASE_NODE(struct Node *node) { return; }
