@@ -4,12 +4,12 @@
 #include <unistd.h>
 
 #define NUM_THREADS 2
+#define MAXLEVEL 1
 
 // Global variable
 struct Node *head, *tail;
 
 // Can be any value to link the values for each node
-int MAXLEVEL = 1;
 
 struct Node *MALLOC_NODE() {
   return malloc(sizeof(struct Node));
