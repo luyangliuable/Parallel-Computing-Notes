@@ -6,35 +6,86 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <math.h>
+
+int check_prime(int n) {
+  int flag = 1, i;
+  // Iterate from 2 to sqrt(n)
+  for (i = 2; i <= sqrt(n); i++) {
+
+    // If n is divisible by any number between
+    // 2 and n/2, it is not prime
+    if (n % i == 0) {
+      flag = 0;
+      break;
+    }
+  }
+
+  if (n <= 1)
+    flag = 0;
+
+  return flag;
+}
+
+char *int_to_str(int *integer) {
+  char *res;
+  int new = *integer;
+  int new2 = *integer;
+
+  int l = 0;
+
+
+  if (*integer == 0) {
+    res = malloc(1);
+    res = "0";
+    return res;
+  }
+
+  while (new != 0) {
+    new = new / 10;
+    l++;
+  }
+
+  l++;
+  res = malloc(l);
+
+  snprintf(res, l, "%d", *integer);
+
+  return res;
+}
+
 
 int main(int argc, char *argv[]) {
-  int rank, s_value, r_value=1, size, rc, tag1 = 1, tag2=2, prev, next;
+  int rank, s_value, r_value = 1, size, rc, tag1 = 1, tag2 = 2, prev, next;
+  FILE *f;
 
   int buff[2];
 
   int value_entered = 0;
 
   MPI_Status Stat;
-  MPI_Init( &argc, &argv );
-  MPI_Comm_rank( MPI_COMM_WORLD, &rank );
-  MPI_Comm_size( MPI_COMM_WORLD, &size );
+  MPI_Init(&argc, &argv);
+  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+  MPI_Comm_size(MPI_COMM_WORLD, &size);
 
   printf("Starting.\n");
 
   prev = rank - 1;
   next = rank + 1;
 
-  if (rank == 0) prev = size - 1;
-  if (rank == (size-1)) next = 0;
+  if (rank == 0)
+    prev = size - 1;
+  if (rank == (size - 1))
+    next = 0;
 
   do {
     if (rank == 0) {
       next = rank + 1;
-      prev = size-1;
+      prev = size - 1;
 
-      if ( !value_entered ) {
+      if (!value_entered) {
         printf("Enter a round number:\n");
-        scanf( "%d", &s_value );
+        scanf("%d", &s_value);
         fflush(stdout);
         value_entered = 1;
       } else {
@@ -50,7 +101,26 @@ int main(int argc, char *argv[]) {
         s_value = r_value - 1;
       }
 
-      printf("Task %i: s value is %i. Sending that to task %i.\n", rank, s_value, next);
+      /***********************************************************************/
+      /*                 Output to proces_x.txt file section                 */
+      /***********************************************************************/
+      char file_n[] = "process_";
+      char *process_id = int_to_str(&rank);
+
+      char *file_n2 = malloc(strlen(file_n) + strlen(process_id) + 4);
+
+      strcat(file_n2, file_n);
+      strcat(file_n2, process_id);
+      strcat(file_n2, ".txt");
+
+      f = fopen(file_n2, "a");
+
+      if (check_prime(r_value)) fprintf(f, "%i\n", r_value);
+
+      fclose(f);
+
+      printf("Task %i: s value is %i. Sending that to task %i.\n", rank,
+             s_value, next);
       fflush(stdout);
 
       // Add your code here
@@ -59,28 +129,49 @@ int main(int argc, char *argv[]) {
     } else {
 
       // Add your code here
-      /* rc = MPI_Recv(&r_value, 1, MPI_INT, prev, tag1, MPI_COMM_WORLD, &Stat); */
+      /* rc = MPI_Recv(&r_value, 1, MPI_INT, prev, tag1, MPI_COMM_WORLD, &Stat);
+       */
       s_value = 0;
 
       printf("Task %i: Receiving.\n", rank);
       rc = MPI_Recv(&r_value, 1, MPI_INT, prev, tag1, MPI_COMM_WORLD, &Stat);
       printf("Task %i: Received.\n", rank);
 
-      if (r_value < 0 ) {
+      /***********************************************************************/
+      /*                 Output to proces_x.txt file section                 */
+      /***********************************************************************/
+      FILE *f;
+      char file_n[] = "process_";
+      char *process_id = int_to_str(&rank);
+
+      char *file_n2 = malloc(strlen(file_n) + strlen(process_id) + 4);
+
+      strcat(file_n2, file_n);
+      strcat(file_n2, process_id);
+      strcat(file_n2, ".txt");
+
+      f = fopen(file_n2, "a");
+
+      if (check_prime(r_value)) fprintf(f, "%i\n", r_value);
+
+      fclose(f);
+
+      if (r_value < 0) {
         rc = MPI_Send(&r_value, 1, MPI_INT, next, tag1, MPI_COMM_WORLD);
         break;
       };
 
       s_value = r_value - 1;
 
-      printf("Task %i: s value is %i. Sending that to task %i.\n", rank, s_value, next);
+      printf("Task %i: s value is %i. Sending that to task %i.\n", rank,
+             s_value, next);
       fflush(stdout);
 
       rc = MPI_Send(&s_value, 1, MPI_INT, next, tag1, MPI_COMM_WORLD);
-
     }
   } while (r_value >= 0);
 
   printf("End.\n");
   MPI_Finalize();
+  return 0;
 }
