@@ -19,10 +19,3 @@ int check_prime(int n) {
   return flag;
 }
 
-int main(int argc, char **argv) {
-  int n = 17;
-
-  int res = check_prime(n);
-
-  printf("%i.\n", res);
-}
