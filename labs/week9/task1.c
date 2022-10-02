@@ -4,11 +4,12 @@
 * Link: https://edoras.sdsu.edu/~mthomas/sp17.605/lectures/MPI-Cart-Comms-and-Topos.pdf
 * Modifications to fix bugs, include an async send and receive and to revise print output
 */
-#include <stdio.h>
+#include "random_prime_numbers.c"
 #include <math.h>
-#include <string.h>
-#include <stdlib.h>
 #include <mpi.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include <time.h>
 #include <unistd.h>
 
@@ -82,29 +83,32 @@ int main(int argc, char *argv[]) {
   MPI_Status send_status[4];
   MPI_Status receive_status[4];
 
-	sleep(my_rank);
-	unsigned int seed = time(NULL);
-	int randomVal = rand_r(&seed) % 100 + 1;
+  /* sleep(my_rank); */
+  int randomVal = generate_prime_number(0, 100, my_rank);
+  /* unsigned int seed = time(NULL); */
+  /* int randomVal = rand_r(&seed) % 100 + 1; */
 
   MPI_Isend(&randomVal, 1, MPI_INT, nbr_i_lo, 0, comm2D, &send_request[0]);
   MPI_Isend(&randomVal, 1, MPI_INT, nbr_i_hi, 0, comm2D, &send_request[1]);
-	MPI_Isend(&randomVal, 1, MPI_INT, nbr_j_lo, 0, comm2D, &send_request[2]);
-	MPI_Isend(&randomVal, 1, MPI_INT, nbr_j_hi, 0, comm2D, &send_request[3]);
+  MPI_Isend(&randomVal, 1, MPI_INT, nbr_j_lo, 0, comm2D, &send_request[2]);
+  MPI_Isend(&randomVal, 1, MPI_INT, nbr_j_hi, 0, comm2D, &send_request[3]);
 
-	int recvValL = -1, recvValR = -1, recvValT = -1, recvValB = -1;
-	MPI_Irecv(&recvValT, 1, MPI_INT, nbr_i_lo, 0, comm2D, &receive_request[0]);
-	MPI_Irecv(&recvValB, 1, MPI_INT, nbr_i_hi, 0, comm2D, &receive_request[1]);
-	MPI_Irecv(&recvValL, 1, MPI_INT, nbr_j_lo, 0, comm2D, &receive_request[2]);
-	MPI_Irecv(&recvValR, 1, MPI_INT, nbr_j_hi, 0, comm2D, &receive_request[3]);
+  int recvValL = -1, recvValR = -1, recvValT = -1, recvValB = -1;
+  MPI_Irecv(&recvValT, 1, MPI_INT, nbr_i_lo, 0, comm2D, &receive_request[0]);
+  MPI_Irecv(&recvValB, 1, MPI_INT, nbr_i_hi, 0, comm2D, &receive_request[1]);
+  MPI_Irecv(&recvValL, 1, MPI_INT, nbr_j_lo, 0, comm2D, &receive_request[2]);
+  MPI_Irecv(&recvValR, 1, MPI_INT, nbr_j_hi, 0, comm2D, &receive_request[3]);
 
   printf("%i.\n", send_status[0].MPI_ERROR);
-	MPI_Waitall(4, send_request, send_status);
-	MPI_Waitall(4, receive_request, receive_status);
+  MPI_Waitall(4, send_request, send_status);
+  MPI_Waitall(4, receive_request, receive_status);
 
-	printf("Global rank: %d. Cart rank: %d. Coord: (%d, %d). Random Val: %d. Recv Top: %d. Recv Bottom: %d. Recv Left: %d. Recv Right: %d.\n", my_rank, my_cart_rank, coord[0], coord[1], randomVal, recvValT, recvValB, recvValL, recvValR);
+  printf("Global rank: %d. Cart rank: %d. Coord: (%d, %d). Random Val: %d. "
+         "Recv Top: %d. Recv Bottom: %d. Recv Left: %d. Recv Right: %d.\n",
+         my_rank, my_cart_rank, coord[0], coord[1], randomVal, recvValT,
+         recvValB, recvValL, recvValR);
 
-
-	MPI_Comm_free( &comm2D );
-	MPI_Finalize();
-	return 0;
+  MPI_Comm_free(&comm2D);
+  MPI_Finalize();
+  return 0;
 }
