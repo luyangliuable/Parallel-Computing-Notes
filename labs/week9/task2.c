@@ -4,6 +4,7 @@
 * Link: https://edoras.sdsu.edu/~mthomas/sp17.605/lectures/MPI-Cart-Comms-and-Topos.pdf
 * Modifications to fix bugs, include an async send and receive and to revise print output
 */
+#include "file_logger.c"
 #include "random_prime_numbers.c"
 #include <math.h>
 #include <mpi.h>
@@ -120,6 +121,7 @@ int main(int argc, char *argv[]) {
   for (int i = 0; i < sizeof(neighbour_ranks) / sizeof(int); i++) {
     if ( neighbour_vals[i] == randomVal) {
       printf("rank %i and %i have equal prime number %i.\n", my_rank, neighbour_ranks[i], randomVal);
+      log_file(my_rank, neighbour_ranks[i], randomVal);
     }
   }
 

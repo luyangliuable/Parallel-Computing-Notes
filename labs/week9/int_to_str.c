@@ -9,6 +9,10 @@
 
 char *int_to_str(int *integer) {
 
+  if (*integer == 0) {
+    return "0";
+  }
+
   int new = *integer;
   int new2 = *integer;
 
