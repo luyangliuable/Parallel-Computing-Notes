@@ -1,5 +1,4 @@
 #include "int_to_str.c"
-#include "random_prime_numbers.c"
 #include <math.h>
 #include <mpi.h>
 #include <stdio.h>
@@ -25,10 +24,10 @@ char *log_file(int my_rank, int other_rank, int prime_number) {
   return file_name;
 }
 
-int main(int argc, char *argv[])
-{
-  char *res = log_file(1, 2, 123);
-  printf("%s.\n", res);
+/* int main(int argc, char *argv[]) */
+/* { */
+/*   char *res = log_file(1, 2, 123); */
+/*   printf("%s.\n", res); */
 
-  exit(0);
-}
+/*   exit(0); */
+/* } */
