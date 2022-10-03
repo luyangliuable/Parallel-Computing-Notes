@@ -18,11 +18,10 @@ char *log_file(int my_rank, int other_rank, int prime_number) {
   strcat(file_name, base_name);
   strcat(file_name, rank);
   strcat(file_name, file_suffix);
-  /* printf("%s.\n", file_name); */
 
-  file = fopen(file_name, "w+");
+  file = fopen(file_name, "a+");
 
-  fprintf(file, "adsaddsa.\n");
+  fprintf(file, "rank %i and rank %i have common prime number %i.\n", my_rank, other_rank, prime_number);
   return file_name;
 }
 
