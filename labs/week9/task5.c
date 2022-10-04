@@ -22,6 +22,14 @@
 #define DISP 1
 
 int main(int argc, char *argv[]) {
+  /**
+   * @brief      3d cartesian virtual topology using mpi
+   *
+   * @details    A 3d communication cartesian field that sends a random prime
+   * number to its immediate neighbour. Then compare the number, if equal write
+   * to output file.
+   *
+   */
 
   int ndims = 3, size, my_rank, reorder, my_cart_rank, ierr;
   int nrows, ncols, nlayers;
@@ -74,23 +82,39 @@ int main(int argc, char *argv[]) {
   if (ierr != 0)
     printf("ERROR[%d] creating CART\n", ierr);
 
-  int dimensions[2];
-  int maxdims;
   int periods[size];
 
-  MPI_Cart_coords(comm2D, my_rank, ndims, coord); // coordinated is returned into the coord array
+  MPI_Cart_coords(comm2D, my_rank, ndims,
+                  coord); // coordinated is returned into the coord array
   MPI_Cart_rank(comm2D, coord, &my_cart_rank);
 
-  MPI_Cart_get(comm2D, ndims, dimensions, periods, coord);
-  nrows = dimensions[0];
-  ncols = dimensions[1];
-  nlayers = (int)size / (dimensions[0] * dimensions[1]);
+  /*
+   * Get the dimensions for each layer
+   */
+  MPI_Cart_get(comm2D, ndims, dims, periods, coord);
+  nrows = dims[0];
+  ncols = dims[1];
 
+  /*
+   * The number of layers are the total number of process
+   * divided by the number of process on each layer
+   */
+  nlayers = (int)size / (dims[0] * dims[1]);
+
+  /*
+   * Right and left shift by 1
+   * get the process 1 block in right and left
+   */
   MPI_Cart_shift(comm2D, SHIFT_ROW, DISP, &nbr_i_lo, &nbr_i_hi);
+
+  /*
+   * Top bottom shift by 1
+   * get the process 1 block in below and above
+   */
   MPI_Cart_shift(comm2D, SHIFT_COL, DISP, &nbr_j_lo, &nbr_j_hi);
 
   /*
-   * The process above the current in the 3d cartesian plane
+   * The process in front or below in the 3d cartesian plane
    * is the current rank + 1
    * below is current rank - 1
    */
@@ -107,9 +131,9 @@ int main(int argc, char *argv[]) {
   }
 
   printf("-------------------\n");
-  printf("Current rank is %i. Current coordinates are (%i, %i, %i). Front is "
-         "%i, behind is %i. To the right is %i, to the left is %i. Above is "
-         "%i, below is %i.\n",
+  printf("Current rank is %i. Current coordinates are (%i, %i, %i). Bottom is "
+         "%i, top is %i. To the right is %i, to the left is %i. front is "
+         "%i, back is %i.\n",
          my_rank, coord[0], coord[1], coord[2], nbr_i_hi, nbr_i_lo, nbr_j_hi,
          nbr_j_lo, nbr_k_hi, nbr_k_lo);
   fflush(stdout);
@@ -119,35 +143,46 @@ int main(int argc, char *argv[]) {
   MPI_Status send_status[4];
   MPI_Status receive_status[4];
 
+  // Generate prime number
   int randomVal = generate_prime_number(0, 10, my_rank);
 
-  int neighbour_ranks[6] = {nbr_i_lo, nbr_i_hi, nbr_j_lo, nbr_j_hi, nbr_k_lo, nbr_k_hi};
+  int neighbour_ranks[6] = {nbr_i_lo, nbr_i_hi, nbr_j_lo,
+                            nbr_j_hi, nbr_k_lo, nbr_k_hi};
 
   for (int i = 0; i < sizeof(neighbour_ranks) / sizeof(int); i++) {
     if (neighbour_ranks >= 0) {
+      /*
+       * Send to neighboring ranks it's **random prime number**
+       */
       MPI_Isend(&randomVal, 1, MPI_INT, neighbour_ranks[i], 0, comm2D,
                 &send_request[i]);
     }
   }
 
-  MPI_Isend(&randomVal, 1, MPI_INT, nbr_i_lo, 0, comm2D, &send_request[0]);
-  MPI_Isend(&randomVal, 1, MPI_INT, nbr_i_hi, 0, comm2D, &send_request[1]);
-  MPI_Isend(&randomVal, 1, MPI_INT, nbr_j_lo, 0, comm2D, &send_request[2]);
-  MPI_Isend(&randomVal, 1, MPI_INT, nbr_j_hi, 0, comm2D, &send_request[3]);
+  for (int i = 0; i < sizeof(neighbour_ranks) / sizeof(int); i++) {
+    MPI_Isend(&randomVal, 1, MPI_INT, neighbour_ranks[i], 0, comm2D,
+              &send_request[i]);
+  }
 
-  int recvValL = -1, recvValR = -1, recvValT = -1, recvValB = -1;
+  int recvValL = -1, recvValR = -1, recvValT = -1, recvValB = -1, recvValF = -1,
+      recvValBk = -1;
 
-  MPI_Irecv(&recvValT, 1, MPI_INT, nbr_i_lo, 0, comm2D, &receive_request[0]);
-  MPI_Irecv(&recvValB, 1, MPI_INT, nbr_i_hi, 0, comm2D, &receive_request[1]);
-  MPI_Irecv(&recvValL, 1, MPI_INT, nbr_j_lo, 0, comm2D, &receive_request[2]);
-  MPI_Irecv(&recvValR, 1, MPI_INT, nbr_j_hi, 0, comm2D, &receive_request[3]);
+  int recv_vals[6] = {recvValL, recvValR, recvValT,
+                      recvValB, recvValF, recvValBk};
 
+  for (int i = 0; i < sizeof(neighbour_ranks) / sizeof(int); i++) {
+    MPI_Irecv(&recv_vals[i], 1, MPI_INT, neighbour_ranks[i], 0, comm2D,
+              &receive_request[i]);
+  }
+
+  /*
+   * Wait for all asynchronous requests to finish.
+   */
   MPI_Waitall(4, send_request, send_status);
   MPI_Waitall(4, receive_request, receive_status);
 
-  int neighbour_vals[4] = {recvValT, recvValB, recvValL, recvValR};
   for (int i = 0; i < sizeof(neighbour_ranks) / sizeof(int); i++) {
-    if (neighbour_ranks[i] >= 0 && neighbour_vals[i] == randomVal) {
+    if (neighbour_ranks[i] >= 0 && recv_vals[i] == randomVal) {
       printf("rank %i and %i have equal prime number %i.\n", my_rank,
              neighbour_ranks[i], randomVal);
       log_file(my_rank, neighbour_ranks[i], randomVal);
@@ -155,9 +190,9 @@ int main(int argc, char *argv[]) {
   }
 
   printf("Global rank: %d. Cart rank: %d. Coord: (%d, %d, %d). Random Val: %d. "
-         "Recv Top: %d. Recv Bottom: %d. Recv Left: %d. Recv Right: %d.\n",
-         my_rank, my_cart_rank, coord[0], coord[1], coord[2], randomVal, recvValT,
-         recvValB, recvValL, recvValR);
+         "Recv Top: %d. Recv Bottom: %d. Recv Left: %d. Recv Right: %d. Receive Front: %d. Rev Back: %d.\n",
+         my_rank, my_cart_rank, coord[0], coord[1], coord[2], randomVal, recv_vals[0],
+         recv_vals[1], recv_vals[2], recv_vals[3], recv_vals[4], recv_vals[5]);
   fflush(stdout);
 
   MPI_Comm_free(&comm2D);
