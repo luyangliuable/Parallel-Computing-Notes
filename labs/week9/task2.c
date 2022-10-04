@@ -95,30 +95,26 @@ int main(int argc, char *argv[]) {
   /*   MPI_Isend(&randomVal, 1, MPI_INT, neighbour_ranks[i], 0, comm2D, &send_request[i]); */
   /* } */
 
-  MPI_Isend(&randomVal, 1, MPI_INT, nbr_i_lo, 0, comm2D, &send_request[0]);
-  MPI_Isend(&randomVal, 1, MPI_INT, nbr_i_hi, 0, comm2D, &send_request[1]);
-  MPI_Isend(&randomVal, 1, MPI_INT, nbr_j_lo, 0, comm2D, &send_request[2]);
-  MPI_Isend(&randomVal, 1, MPI_INT, nbr_j_hi, 0, comm2D, &send_request[3]);
+  for (int i = 0; i < sizeof(neighbour_ranks) / sizeof(int); i++) {
+    MPI_Isend(&randomVal, 1, MPI_INT, neighbour_ranks[i], 0, comm2D,
+              &send_request[i]);
+  }
 
   int recvValL = -1, recvValR = -1, recvValT = -1, recvValB = -1;
 
-  /* for (int i = 0; i < sizeof(neighbour_ranks) / sizeof(int); i++) { */
-  /*   MPI_Irecv(&recvValT, 1, MPI_INT, neighbour_ranks[i], 0, comm2D, &receive_request[i]); */
-  /* } */
+  int recv_vals[4] = {recvValL, recvValR, recvValT, recvValB};
 
-
-  MPI_Irecv(&recvValT, 1, MPI_INT, nbr_i_lo, 0, comm2D, &receive_request[0]);
-  MPI_Irecv(&recvValB, 1, MPI_INT, nbr_i_hi, 0, comm2D, &receive_request[1]);
-  MPI_Irecv(&recvValL, 1, MPI_INT, nbr_j_lo, 0, comm2D, &receive_request[2]);
-  MPI_Irecv(&recvValR, 1, MPI_INT, nbr_j_hi, 0, comm2D, &receive_request[3]);
-
+  for (int i = 0; i < sizeof(neighbour_ranks) / sizeof(int); i++) {
+    MPI_Irecv(&recv_vals[i], 1, MPI_INT, neighbour_ranks[i], 0, comm2D,
+              &receive_request[i]);
+  }
 
   MPI_Waitall(4, send_request, send_status);
   MPI_Waitall(4, receive_request, receive_status);
 
-  int neighbour_vals[4] = {recvValT, recvValB, recvValL, recvValR};
+  /* int neighbour_vals[4] = {recvValT, recvValB, recvValL, recvValR}; */
   for (int i = 0; i < sizeof(neighbour_ranks) / sizeof(int); i++) {
-    if ( neighbour_vals[i] == randomVal) {
+    if ( recv_vals[i] == randomVal) {
       printf("rank %i and %i have equal prime number %i.\n", my_rank, neighbour_ranks[i], randomVal);
       log_file(my_rank, neighbour_ranks[i], randomVal);
     }
@@ -126,8 +122,8 @@ int main(int argc, char *argv[]) {
 
   printf("Global rank: %d. Cart rank: %d. Coord: (%d, %d). Random Val: %d. "
          "Recv Top: %d. Recv Bottom: %d. Recv Left: %d. Recv Right: %d.\n",
-         my_rank, my_cart_rank, coord[0], coord[1], randomVal, recvValT,
-         recvValB, recvValL, recvValR);
+         my_rank, my_cart_rank, coord[0], coord[1], randomVal, recv_vals[0],
+         recv_vals[1], recv_vals[2], recv_vals[3]);
 
   MPI_Comm_free(&comm2D);
   MPI_Finalize();
