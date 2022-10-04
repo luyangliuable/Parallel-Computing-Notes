@@ -58,7 +58,7 @@ int main(int argc, char *argv[]) {
 	wrap_around[0] = 0;
 	wrap_around[1] = 0; /* periodic shift is .false. */
 	reorder = 1;
-	ierr =0;
+	ierr = 0;
 	ierr = MPI_Cart_create(MPI_COMM_WORLD, ndims, dims, wrap_around, reorder, &comm2D);
 	if(ierr != 0) printf("ERROR[%d] creating CART\n",ierr);
 
@@ -91,7 +91,7 @@ int main(int argc, char *argv[]) {
         MPI_Request receive_request[4];
         MPI_Status send_status[4];
         MPI_Status receive_status[4];
-
+        
 	sleep(my_rank);
 	unsigned int seed = time(NULL);
 	int randomVal = rand_r(&seed) % 100 + 1;
