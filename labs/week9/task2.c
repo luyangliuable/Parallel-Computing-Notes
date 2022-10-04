@@ -113,7 +113,6 @@ int main(int argc, char *argv[]) {
   MPI_Irecv(&recvValR, 1, MPI_INT, nbr_j_hi, 0, comm2D, &receive_request[3]);
 
 
-  printf("%i.\n", send_status[0].MPI_ERROR);
   MPI_Waitall(4, send_request, send_status);
   MPI_Waitall(4, receive_request, receive_status);
 
