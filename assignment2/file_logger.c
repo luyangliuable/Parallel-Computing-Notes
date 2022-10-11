@@ -20,8 +20,6 @@ char *log_file(int my_rank, int other_rank, int prime_number) {
 
   file = fopen(file_name, "a+");
 
-  fprintf(file, "rank %i and rank %i have common prime number %i.\n", my_rank,
-          other_rank, prime_number);
   return file_name;
 }
 

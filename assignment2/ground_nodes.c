@@ -15,6 +15,65 @@
 
 int master_io(MPI_Comm master_comm, MPI_Comm comm, int size);
 int slave_io(MPI_Comm master_comm, MPI_Comm comm);
+int earthquake_detection_system(int my_rank, int size, MPI_Comm master_comm,
+                                MPI_Comm comm, int argc, char **argv);
+
+int main(int argc, char **argv) {
+  /**
+   * @brief      The main function the separates the communication into slave
+   and master communication through using colors
+   *
+   * @details    Master has color 1 and slaves have color 0.
+   *
+   * @param      argc - The argument count
+   *
+   * @param      argv - The array of string arguments.
+   *
+   * @return     return 0
+   */
+
+  int rank, size;
+  MPI_Comm new_comm;
+  MPI_Init(&argc, &argv);
+
+  /*
+   * The size is the number of processes
+   * slave = size - 1
+   * master = 1
+   */
+  MPI_Comm_size(MPI_COMM_WORLD, &size);
+  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+
+  /*
+   * Split The communication color into two kinds (master, slave)
+   * master_color = 1
+   * slave_color = 0
+   */
+  /* MPI_Comm_split(MPI_COMM_WORLD, rank == 0, 0, &new_comm); */
+  MPI_Group group;
+  MPI_Group old_group;
+  MPI_Comm_group(MPI_COMM_WORLD, &old_group);
+  int *groups_to_incl = (int *)malloc((size - 1) * sizeof(int));
+  for (int i = 1; i < size; i++) {
+    groups_to_incl[i - 1] = i;
+  }
+
+  MPI_Group_incl(old_group, size - 1, groups_to_incl, &group);
+  MPI_Comm_create(MPI_COMM_WORLD, group, &new_comm);
+
+  int size2;
+
+  if (rank != 0) {
+    MPI_Comm_size(new_comm, &size2);
+    earthquake_detection_system(rank, size - 1, MPI_COMM_WORLD, new_comm, argc,
+                                argv);
+  }
+
+  MPI_Finalize();
+
+  free(groups_to_incl);
+  return 0;
+}
 
 int earthquake_detection_system(int my_rank, int size, MPI_Comm master_comm,
                                 MPI_Comm comm, int argc, char **argv) {
@@ -66,7 +125,6 @@ int earthquake_detection_system(int my_rank, int size, MPI_Comm master_comm,
   MPI_Cart_shift(comm2D, SHIFT_ROW, DISP, &nbr_i_lo, &nbr_i_hi);
   MPI_Cart_shift(comm2D, SHIFT_COL, DISP, &nbr_j_lo, &nbr_j_hi);
 
-
   int neighbour_ranks[4] = {nbr_i_lo, nbr_i_hi, nbr_j_lo, nbr_j_hi};
   int recv_vals[4];
 
@@ -79,16 +137,14 @@ int earthquake_detection_system(int my_rank, int size, MPI_Comm master_comm,
   MPI_Status receive_status[4];
 
   while (1) {
-    float earthquake_magnitude = detect_earthquake(0, 12, my_rank);
+    float earthquake_magnitude = detect_earthquake(0, 8, my_rank);
     init_reading(&seismic_readings[c], coord[0], coord[1], 9);
     record_current_time(&seismic_readings[c]);
     record_magnitude(&seismic_readings[c], earthquake_magnitude);
     print_readings(seismic_readings[c]);
 
     for (int i = 0; i < sizeof(neighbour_ranks) / sizeof(int); i++) {
-      float r = 1.12;
-      printf("%.2f.\n", r);
-      MPI_Isend(&r, 1, MPI_FLOAT, neighbour_ranks[i], 0, comm2D,
+      MPI_Isend(&earthquake_magnitude, 1, MPI_FLOAT, neighbour_ranks[i], 0, comm2D,
                 &send_request[i]);
     }
 
@@ -113,10 +169,10 @@ int earthquake_detection_system(int my_rank, int size, MPI_Comm master_comm,
       }
     }
 
-    printf("Global rank: %d. Cart rank: %d. Coord: (%d, %d). Magnitude: %.2f. "
-           "Recv Top: %d. Recv Bottom: %d. Recv Left: %d. Recv Right: %d.\n",
-           my_rank, my_rank, coord[0], coord[1], earthquake_magnitude,
-           recv_vals[0], recv_vals[1], recv_vals[2], recv_vals[3]);
+    /* printf("Global rank: %d. Cart rank: %d. Coord: (%d, %d). Magnitude: %.2f. " */
+    /*        "Recv Top: %d. Recv Bottom: %d. Recv Left: %d. Recv Right: %d.\n", */
+    /*        my_rank, my_rank, coord[0], coord[1], earthquake_magnitude, */
+    /*        recv_vals[0], recv_vals[1], recv_vals[2], recv_vals[3]); */
     sleep(1);
     c++;
   }
@@ -192,7 +248,7 @@ int master_io(MPI_Comm master_comm, MPI_Comm comm, int size) {
     /* MPI_Waitall(size-1, requests, statuses); */
 
     /*************************************************************************/
-    /*                If all Processes finished, exit polling                */
+    /*                If all Processes finished, exit polling */
     /*************************************************************************/
     flag = 1;
     for (int w = 0; w < size - 1; w++) {
@@ -203,68 +259,5 @@ int master_io(MPI_Comm master_comm, MPI_Comm comm, int size) {
     if (flag == 1)
       break;
   }
-  return 0;
-}
-
-int main(int argc, char **argv) {
-  /**
-   * @brief      The main function the separates the communication into slave
-   and master communication through using colors
-   *
-   * @details    Master has color 1 and slaves have color 0.
-   *
-   * @param      argc - The argument count
-   *
-   * @param      argv - The array of string arguments.
-   *
-   * @return     return 0
-   */
-
-  int rank, size;
-  MPI_Comm new_comm;
-  MPI_Init(&argc, &argv);
-
-  /*
-   * The size is the number of processes
-   * slave = size - 1
-   * master = 1
-   */
-  MPI_Comm_size(MPI_COMM_WORLD, &size);
-  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-
-  /*
-   * Split The communication color into two kinds (master, slave)
-   * master_color = 1
-   * slave_color = 0
-   */
-  /* MPI_Comm_split(MPI_COMM_WORLD, rank == 0, 0, &new_comm); */
-  MPI_Group group;
-  MPI_Group old_group;
-  MPI_Comm_group(MPI_COMM_WORLD, &old_group);
-  int *groups_to_incl = (int *)malloc((size - 1) * sizeof(int));
-  for (int i = 1; i < size; i++) {
-    groups_to_incl[i - 1] = i;
-  }
-
-  MPI_Group_incl(old_group, size - 1, groups_to_incl, &group);
-  MPI_Comm_create(MPI_COMM_WORLD, group, &new_comm);
-
-  int size2;
-
-  if (rank != 0) {
-    MPI_Comm_size(new_comm, &size2);
-    printf("%i, %i.\n", size2, rank);
-    earthquake_detection_system(rank, size - 1, MPI_COMM_WORLD, new_comm, argc,
-                                argv);
-  }
-
-  /* if (rank == 0) */
-  /*   // Run master */
-  /*   master_io(MPI_COMM_WORLD, new_comm, size); */
-  /* else */
-  // Run slave processes
-  MPI_Finalize();
-
-  free(groups_to_incl);
   return 0;
 }
