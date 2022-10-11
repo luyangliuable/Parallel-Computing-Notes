@@ -30,6 +30,6 @@ float detect_earthquake(int lo, int hi, int rank) {
   sleep(rank);
   unsigned int seed = time(NULL) + rank;
   float random_earthquake_float = generate_rand(lo, hi, 100, &seed)/100;
-  printf("%.2f, %.2f\n", prev, random_earthquake_float);
+  /* printf("%.2f, %.2f\n", prev, random_earthquake_float); */
   return random_earthquake_float;
 }

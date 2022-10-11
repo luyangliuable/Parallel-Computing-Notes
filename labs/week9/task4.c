@@ -38,7 +38,7 @@ int main(int argc, char **argv) {
    * master_color = 1
    * slave_color = 0
    */
-  MPI_Comm_split(MPI_COMM_WORLD, rank == 0, 0, &new_comm);
+  /* MPI_Comm_split(MPI_COMM_WORLD, rank == 0, 0, &new_comm); */
 
   if (rank == 0)
     // Run master
@@ -155,7 +155,7 @@ int slave_io(MPI_Comm master_comm, MPI_Comm comm) {
   int master_rank = 0;
   MPI_Request request;
 
-  MPI_Comm_rank(master_comm, &rank);
+  MPI_Comm_rank(comm, &rank);
   sprintf(buf, "Hello from slave %d\n", rank);
   MPI_Send(buf, strlen(buf) + 1, MPI_CHAR, master_rank, 0, master_comm);
 
