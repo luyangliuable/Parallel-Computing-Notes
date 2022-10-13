@@ -8,6 +8,7 @@
 #include <string.h>
 #include <time.h>
 #include <unistd.h>
+#include "utility.c"
 
 #define SHIFT_ROW 0
 #define SHIFT_COL 1
@@ -17,6 +18,8 @@ int master_io(MPI_Comm master_comm, MPI_Comm comm, int size);
 int slave_io(MPI_Comm master_comm, MPI_Comm comm);
 int earthquake_detection_system(int my_rank, int size, MPI_Comm master_comm,
                                 MPI_Comm comm, int argc, char **argv);
+float compute_absolute_diff(float value1, float value2);
+float compute_distance(int *coord1, int *coord2);
 
 int main(int argc, char **argv) {
   /**
@@ -77,6 +80,8 @@ int main(int argc, char **argv) {
 
 int earthquake_detection_system(int my_rank, int size, MPI_Comm master_comm,
                                 MPI_Comm comm, int argc, char **argv) {
+  float absolute_difference[4];
+  float euclidean_distances[4];
   int ndims = 2, reorder, my_cart_rank, ierr;
   int nrows, ncols;
   int nbr_i_lo, nbr_i_hi;
@@ -126,7 +131,7 @@ int earthquake_detection_system(int my_rank, int size, MPI_Comm master_comm,
   MPI_Cart_shift(comm2D, SHIFT_COL, DISP, &nbr_j_lo, &nbr_j_hi);
 
   int neighbour_ranks[4] = {nbr_i_lo, nbr_i_hi, nbr_j_lo, nbr_j_hi};
-  int recv_vals[4];
+  float recv_vals[4];
 
   seismic_reading seismic_readings[100];
   int c = 0;
@@ -144,8 +149,8 @@ int earthquake_detection_system(int my_rank, int size, MPI_Comm master_comm,
     print_readings(seismic_readings[c]);
 
     for (int i = 0; i < sizeof(neighbour_ranks) / sizeof(int); i++) {
-      MPI_Isend(&earthquake_magnitude, 1, MPI_FLOAT, neighbour_ranks[i], 0, comm2D,
-                &send_request[i]);
+      MPI_Isend(&earthquake_magnitude, 1, MPI_FLOAT, neighbour_ranks[i], 0,
+                comm2D, &send_request[i]);
     }
 
     recv_vals[0] = -1;
@@ -169,10 +174,34 @@ int earthquake_detection_system(int my_rank, int size, MPI_Comm master_comm,
       }
     }
 
-    /* printf("Global rank: %d. Cart rank: %d. Coord: (%d, %d). Magnitude: %.2f. " */
-    /*        "Recv Top: %d. Recv Bottom: %d. Recv Left: %d. Recv Right: %d.\n", */
-    /*        my_rank, my_rank, coord[0], coord[1], earthquake_magnitude, */
-    /*        recv_vals[0], recv_vals[1], recv_vals[2], recv_vals[3]); */
+    /***********************************************************************/
+    /*                    Calculate absolute differences                   */
+    /***********************************************************************/
+    for (int i = 0; i < size; i++) {
+      int tmp_coord[2];
+      if (recv_vals[i] > 0 && i != my_rank) {
+        MPI_Cart_coords(
+            comm2D, i, ndims,
+            tmp_coord); // coordinate is returned into the coord array
+
+        absolute_difference[i] =
+            compute_absolute_diff(earthquake_magnitude, recv_vals[i]);
+        euclidean_distances[i] = compute_distance(coord, tmp_coord);
+        printf("(%d, %d): Absolute difference is %.2f.\n", coord[0], coord[1],
+               absolute_difference[i]);
+        printf("(%d, %d): Distance with (%d, %d) is %.2f.\n", coord[0],
+               coord[1], tmp_coord[0], tmp_coord[1], euclidean_distances[i]);
+      } else {
+        absolute_difference[i] = -1;
+        euclidean_distances[i] = -1;
+      }
+    }
+
+    printf("Global rank: %d. Coord: (%d, %d). Magnitude: %.2f. "
+           "Recv Top: %.2f. Recv Bottom: %.2f. Recv Left: %.2f. Recv Right: "
+           "%.2f.\n",
+           my_rank, coord[0], coord[1], earthquake_magnitude, recv_vals[0],
+           recv_vals[1], recv_vals[2], recv_vals[3]);
     sleep(1);
     c++;
   }
