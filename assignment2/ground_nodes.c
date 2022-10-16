@@ -1,6 +1,7 @@
 #include "file_logger.c"
 #include "headers.c"
 #include "random_readings_generator.c"
+#include "utility.c"
 #include <math.h>
 #include <mpi.h>
 #include <stdio.h>
@@ -8,7 +9,6 @@
 #include <string.h>
 #include <time.h>
 #include <unistd.h>
-#include "utility.c"
 
 #define SHIFT_ROW 0
 #define SHIFT_COL 1
@@ -18,8 +18,10 @@ int master_io(MPI_Comm master_comm, MPI_Comm comm, int size);
 int slave_io(MPI_Comm master_comm, MPI_Comm comm);
 int earthquake_detection_system(int my_rank, int size, MPI_Comm master_comm,
                                 MPI_Comm comm, int argc, char **argv);
-float compute_absolute_diff(float value1, float value2);
-float compute_distance(int *coord1, int *coord2);
+
+/* double compute_absolute_diff(double value1, double value2); */
+double compute_distance(int *coord1, int *coord2);
+void ground_node(MPI_Comm master_comm);
 
 int main(int argc, char **argv) {
   /**
@@ -70,6 +72,8 @@ int main(int argc, char **argv) {
     MPI_Comm_size(new_comm, &size2);
     earthquake_detection_system(rank, size - 1, MPI_COMM_WORLD, new_comm, argc,
                                 argv);
+  } else {
+    ground_node(MPI_COMM_WORLD);
   }
 
   MPI_Finalize();
@@ -78,10 +82,22 @@ int main(int argc, char **argv) {
   return 0;
 }
 
+void ground_node(MPI_Comm master_comm) {
+  seismic_reading reading;
+  MPI_Datatype MPI_SEISMIC_READING = create_root_datatype(reading);
+  MPI_Status status;
+  while (1) {
+    MPI_Recv(&reading, 1, MPI_SEISMIC_READING, MPI_ANY_SOURCE, 0, master_comm,
+             &status);
+    print_readings(reading);
+    sleep(3);
+  }
+}
+
 int earthquake_detection_system(int my_rank, int size, MPI_Comm master_comm,
                                 MPI_Comm comm, int argc, char **argv) {
-  float absolute_difference[4];
-  float euclidean_distances[4];
+  double absolute_difference[4];
+  double euclidean_distances[4];
   int ndims = 2, reorder, my_cart_rank, ierr;
   int nrows, ncols;
   int nbr_i_lo, nbr_i_hi;
@@ -131,7 +147,7 @@ int earthquake_detection_system(int my_rank, int size, MPI_Comm master_comm,
   MPI_Cart_shift(comm2D, SHIFT_COL, DISP, &nbr_j_lo, &nbr_j_hi);
 
   int neighbour_ranks[4] = {nbr_i_lo, nbr_i_hi, nbr_j_lo, nbr_j_hi};
-  float recv_vals[4];
+  double recv_vals[4];
 
   seismic_reading seismic_readings[100];
   int c = 0;
@@ -142,14 +158,17 @@ int earthquake_detection_system(int my_rank, int size, MPI_Comm master_comm,
   MPI_Status receive_status[4];
 
   while (1) {
-    float earthquake_magnitude = detect_earthquake(0, 8, my_rank);
+    double earthquake_magnitude = detect_earthquake(0, 8, my_rank);
     init_reading(&seismic_readings[c], coord[0], coord[1], 9);
     record_current_time(&seismic_readings[c]);
     record_magnitude(&seismic_readings[c], earthquake_magnitude);
-    print_readings(seismic_readings[c]);
+    /* print_readings(seismic_readings[c]); */
+    MPI_Datatype MPI_SEISMIC_READING =
+        create_root_datatype(seismic_readings[c]);
+    MPI_Send(&seismic_readings[c], 1, MPI_SEISMIC_READING, 0, 0, master_comm);
 
     for (int i = 0; i < sizeof(neighbour_ranks) / sizeof(int); i++) {
-      MPI_Isend(&earthquake_magnitude, 1, MPI_FLOAT, neighbour_ranks[i], 0,
+      MPI_Isend(&earthquake_magnitude, 1, MPI_DOUBLE, neighbour_ranks[i], 0,
                 comm2D, &send_request[i]);
     }
 
@@ -159,7 +178,7 @@ int earthquake_detection_system(int my_rank, int size, MPI_Comm master_comm,
     recv_vals[3] = -1;
 
     for (int i = 0; i < sizeof(neighbour_ranks) / sizeof(int); i++) {
-      MPI_Irecv(&recv_vals[i], 1, MPI_FLOAT, neighbour_ranks[i], 0, comm2D,
+      MPI_Irecv(&recv_vals[i], 1, MPI_DOUBLE, neighbour_ranks[i], 0, comm2D,
                 &receive_request[i]);
     }
 
@@ -186,7 +205,10 @@ int earthquake_detection_system(int my_rank, int size, MPI_Comm master_comm,
 
         absolute_difference[i] =
             compute_absolute_diff(earthquake_magnitude, recv_vals[i]);
-        euclidean_distances[i] = compute_distance(coord, tmp_coord);
+
+        // Distance in kilometers
+        euclidean_distances[i] =
+            distance(coord[0], coord[1], tmp_coord[0], tmp_coord[1], 'K');
         printf("(%d, %d): Absolute difference is %.2f.\n", coord[0], coord[1],
                absolute_difference[i]);
         printf("(%d, %d): Distance with (%d, %d) is %.2f.\n", coord[0],
@@ -273,8 +295,6 @@ int master_io(MPI_Comm master_comm, MPI_Comm comm, int size) {
         }
       }
     }
-
-    /* MPI_Waitall(size-1, requests, statuses); */
 
     /*************************************************************************/
     /*                If all Processes finished, exit polling */
