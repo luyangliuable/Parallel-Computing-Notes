@@ -89,6 +89,11 @@ void ground_node(MPI_Comm master_comm) {
   while (1) {
     MPI_Recv(&reading, 1, MPI_SEISMIC_READING, MPI_ANY_SOURCE, 0, master_comm,
              &status);
+
+    // TODO compare with seismic balloon sensor
+    // If match, conclusive alert
+    // Else, inconclusive alert
+
     sleep(3);
   }
 }

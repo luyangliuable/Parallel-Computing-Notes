@@ -1,0 +1,6 @@
+Simulation Time: 1001 seconds
+Number of Alerts Detected: 2312
+Number of Messages from P rank 0 with neighbor: 12
+Number of Messages from P rank 1 with neighbor: 12
+Number of Messages from P rank 2 with neighbor: 11
+Total Number of Messages: 15
