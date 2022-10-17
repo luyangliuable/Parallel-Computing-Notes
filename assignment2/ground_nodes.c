@@ -89,7 +89,6 @@ void ground_node(MPI_Comm master_comm) {
   while (1) {
     MPI_Recv(&reading, 1, MPI_SEISMIC_READING, MPI_ANY_SOURCE, 0, master_comm,
              &status);
-    print_readings(reading);
     sleep(3);
   }
 }
@@ -163,6 +162,12 @@ int earthquake_detection_system(int my_rank, int size, MPI_Comm master_comm,
     record_current_time(&seismic_readings[c]);
     record_magnitude(&seismic_readings[c], earthquake_magnitude);
     /* print_readings(seismic_readings[c]); */
+    printf("%s\n", seismic_readings[c].source);
+    printf("%s\n", seismic_readings[c].source);
+    printf("%s\n", seismic_readings[c].source);
+    printf("%s\n", seismic_readings[c].source);
+    printf("%s\n", seismic_readings[c].source);
+    printf("%s\n", seismic_readings[c].source);
     MPI_Datatype MPI_SEISMIC_READING =
         create_root_datatype(seismic_readings[c]);
     MPI_Send(&seismic_readings[c], 1, MPI_SEISMIC_READING, 0, 0, master_comm);
