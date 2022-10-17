@@ -3,6 +3,7 @@
 #include <mpi.h>
 #include <stdio.h>
 
+
 MPI_Datatype create_root_datatype(root the_root);
 
 int main(int argc, char *argv[]) {
