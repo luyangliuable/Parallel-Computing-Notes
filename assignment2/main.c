@@ -23,7 +23,7 @@ int earthquake_detection_system(int my_rank, int size, MPI_Comm master_comm,
 
 /* double compute_absolute_diff(double value1, double value2); */
 double compute_distance(int *coord1, int *coord2);
-void ground_node(MPI_Comm master_comm, int *no_of_messages_per_node, struct timespec startComp);
+void base_station(MPI_Comm master_comm, int *no_of_messages_per_node, struct timespec startComp);
 
 void *proper_shutdown_slave(void *vargp) {
   // TODO NOT WORKING!
@@ -117,7 +117,7 @@ int main(int argc, char **argv) {
   } else {
     pthread_t thread_id;
     pthread_create(&thread_id, NULL, proper_shutdown_master, NULL);
-    ground_node(MPI_COMM_WORLD, no_of_messages_per_node, startComp);
+    base_station(MPI_COMM_WORLD, no_of_messages_per_node, startComp);
   }
 
   MPI_Finalize();
@@ -126,7 +126,7 @@ int main(int argc, char **argv) {
   return 0;
 }
 
-void ground_node(MPI_Comm master_comm, int *no_of_messages_per_node, struct timespec startComp) {
+void base_station(MPI_Comm master_comm, int *no_of_messages_per_node, struct timespec startComp) {
   int no_of_alerts = 0;
   printf("ground node start.\n");
   seismic_reading reading;
