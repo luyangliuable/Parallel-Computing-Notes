@@ -1,0 +1,12 @@
+Simulation Time: 16 seconds
+Number of Alerts Detected: 6
+Number of Messages from P rank 0 with neighbor: 6
+Number of Messages from P rank 1 with neighbor: 1
+Number of Messages from P rank 2 with neighbor: 15712352
+Total Number of Messages: 15712359
+Simulation Time: 19 seconds
+Number of Alerts Detected: 7
+Number of Messages from P rank 0 with neighbor: 7
+Number of Messages from P rank 1 with neighbor: 1
+Number of Messages from P rank 2 with neighbor: 15712352
+Total Number of Messages: 15712360

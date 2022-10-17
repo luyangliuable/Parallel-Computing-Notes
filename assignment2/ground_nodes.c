@@ -1,9 +1,11 @@
 #include "file_logger.c"
 #include "headers.c"
 #include "random_readings_generator.c"
+#include "log_to_file.c"
 #include "utility.c"
 #include <math.h>
 #include <mpi.h>
+#include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -21,7 +23,36 @@ int earthquake_detection_system(int my_rank, int size, MPI_Comm master_comm,
 
 /* double compute_absolute_diff(double value1, double value2); */
 double compute_distance(int *coord1, int *coord2);
-void ground_node(MPI_Comm master_comm);
+void ground_node(MPI_Comm master_comm, int *no_of_messages_per_node, struct timespec startComp);
+
+void *proper_shutdown_slave(void *vargp) {
+  // TODO NOT WORKING!
+  int tmp;
+  MPI_Status status;
+  MPI_Recv(&tmp, 1, MPI_INT, 0, 1, MPI_COMM_WORLD, &status);
+  printf("Quiting slave processes.\n");
+  exit(0);
+}
+
+void *proper_shutdown_master(void *vargp) {
+  printf("Press q Key to quit program.\n");
+
+  int size;
+  int q = 1;
+
+  while (1) {
+    char c = getchar();
+
+    if (c == 'q' || c == 'Q') {
+      MPI_Send(&q, 1, MPI_INT, 0, 1, MPI_COMM_WORLD);
+      printf("Quiting.\n");
+
+      MPI_Finalize();
+      exit(0);
+    }
+    sleep(1);
+  }
+}
 
 int main(int argc, char **argv) {
   /**
@@ -37,6 +68,10 @@ int main(int argc, char **argv) {
    * @return     return 0
    */
 
+  struct timespec start, end, startComp, endComp;
+
+  clock_gettime(CLOCK_MONOTONIC, &startComp);
+
   int rank, size;
   MPI_Comm new_comm;
   MPI_Init(&argc, &argv);
@@ -48,6 +83,9 @@ int main(int argc, char **argv) {
    */
   MPI_Comm_size(MPI_COMM_WORLD, &size);
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+
+  int no_of_messages_per_node[size];
+  no_of_messages_per_node[0] = 0;
 
   /*
    * Split The communication color into two kinds (master, slave)
@@ -69,11 +107,17 @@ int main(int argc, char **argv) {
   int size2;
 
   if (rank != 0) {
+    // TODO slave shutdown gives segmentation fault 11
+    /* pthread_t thread_id; */
+    /* pthread_create(&thread_id, NULL, proper_shutdown_slave, NULL); */
+
     MPI_Comm_size(new_comm, &size2);
     earthquake_detection_system(rank, size - 1, MPI_COMM_WORLD, new_comm, argc,
                                 argv);
   } else {
-    ground_node(MPI_COMM_WORLD);
+    pthread_t thread_id;
+    pthread_create(&thread_id, NULL, proper_shutdown_master, NULL);
+    ground_node(MPI_COMM_WORLD, no_of_messages_per_node, startComp);
   }
 
   MPI_Finalize();
@@ -82,13 +126,29 @@ int main(int argc, char **argv) {
   return 0;
 }
 
-void ground_node(MPI_Comm master_comm) {
+void ground_node(MPI_Comm master_comm, int *no_of_messages_per_node, struct timespec startComp) {
+  int no_of_alerts = 0;
+  printf("ground node start.\n");
   seismic_reading reading;
   MPI_Datatype MPI_SEISMIC_READING = create_root_datatype(reading);
   MPI_Status status;
   while (1) {
     MPI_Recv(&reading, 1, MPI_SEISMIC_READING, MPI_ANY_SOURCE, 0, master_comm,
              &status);
+    no_of_messages_per_node[0]++;
+    print_readings(reading);
+
+    no_of_alerts++;
+    // TODO compare with seismic balloon sensor
+    // If match, conclusive alert
+    // Else, inconclusive alert
+
+    struct timespec curr_time;
+    clock_gettime(CLOCK_MONOTONIC, &curr_time);
+    double time_taken = (curr_time.tv_sec - startComp.tv_sec) * 1e9;
+    time_taken = (time_taken + (curr_time.tv_nsec - startComp.tv_nsec)) * 1e-9;
+
+    log_to_file(time_taken, no_of_alerts, no_of_messages_per_node);
     sleep(3);
   }
 }
@@ -162,12 +222,6 @@ int earthquake_detection_system(int my_rank, int size, MPI_Comm master_comm,
     record_current_time(&seismic_readings[c]);
     record_magnitude(&seismic_readings[c], earthquake_magnitude);
     /* print_readings(seismic_readings[c]); */
-    printf("%s\n", seismic_readings[c].source);
-    printf("%s\n", seismic_readings[c].source);
-    printf("%s\n", seismic_readings[c].source);
-    printf("%s\n", seismic_readings[c].source);
-    printf("%s\n", seismic_readings[c].source);
-    printf("%s\n", seismic_readings[c].source);
     MPI_Datatype MPI_SEISMIC_READING =
         create_root_datatype(seismic_readings[c]);
     MPI_Send(&seismic_readings[c], 1, MPI_SEISMIC_READING, 0, 0, master_comm);
@@ -235,83 +289,5 @@ int earthquake_detection_system(int my_rank, int size, MPI_Comm master_comm,
 
   MPI_Comm_free(&comm2D);
   MPI_Finalize();
-  return 0;
-}
-
-int master_io(MPI_Comm master_comm, MPI_Comm comm, int size) {
-  /**
-   * @brief      The master process.
-   *
-   * @details    Polls for every new message and exit status from slave
-   processes.
-   *
-   * @param      master_comm The communication channel including the subgroup
-   new_comm.
-   *
-   * @param      comm The slave communication channel.
-   *
-   * @param      size The total number of processes.
-   *
-   * @return     return 0
-   */
-  int i, j;
-  char buf[256];
-  MPI_Status status;
-  MPI_Status statuses[size - 1];
-  MPI_Request requests[size - 1];
-
-  int finished[size - 1];
-
-  /*
-   * flag to indicate that all processes from slave concluded/exited.
-   * If flag = 1, exit master because there is not slave nodes left.
-   * If flag = 0, keep running master process.
-   */
-  int flag = 0;
-  for (int w = 0; w < size; w++)
-    finished[w] = 0;
-
-  while (1) {
-    /*
-     * Continuously poll for new messages until all slave processes exit.
-     */
-
-    printf("-----------------------------\n");
-    for (i = 1; i < size; i++) {
-      /*
-       * Each poll gets the next message from every process.
-       */
-      if (finished[i - 1] == 0) {
-        /*
-         * Ignore messages from exited processes even if that is not possible.
-         */
-
-        // The get message from any tag. But tag=0 means normal message, tag=1
-        // means exit.
-        MPI_Recv(buf, 256, MPI_CHAR, i, MPI_ANY_TAG, master_comm, &status);
-
-        if (status.MPI_TAG == 0)
-          // Print out normal message
-          fputs(buf, stdout);
-
-        if (status.MPI_TAG == 1) {
-          printf("Slave %i exited.\n", i - 1);
-          finished[i - 1] = 1;
-        }
-      }
-    }
-
-    /*************************************************************************/
-    /*                If all Processes finished, exit polling */
-    /*************************************************************************/
-    flag = 1;
-    for (int w = 0; w < size - 1; w++) {
-      if (finished[w] == 0)
-        flag = 0;
-    }
-
-    if (flag == 1)
-      break;
-  }
   return 0;
 }

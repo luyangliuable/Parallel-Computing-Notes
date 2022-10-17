@@ -1,0 +1,2 @@
+https://www.tutorialspoint.com/how-to-get-the-ip-address-of-local-computer-using-c-cplusplus
+https://stackoverflow.com/questions/1624480/c-terminating-the-program-by-pressing-a-key
