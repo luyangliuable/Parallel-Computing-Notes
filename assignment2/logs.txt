@@ -10,3 +10,45 @@ Number of Messages from P rank 0 with neighbor: 7
 Number of Messages from P rank 1 with neighbor: 1
 Number of Messages from P rank 2 with neighbor: 15712352
 Total Number of Messages: 15712360
+Simulation Time: 1 seconds
+Number of Alerts Detected: 1
+Number of Messages from P rank 0 with neighbor: 1
+Number of Messages from P rank 1 with neighbor: 1
+Number of Messages from P rank 2 with neighbor: 80822368
+Total Number of Messages: 80822370
+Simulation Time: 4 seconds
+Number of Alerts Detected: 2
+Number of Messages from P rank 0 with neighbor: 2
+Number of Messages from P rank 1 with neighbor: 1
+Number of Messages from P rank 2 with neighbor: 80822368
+Total Number of Messages: 80822371
+Simulation Time: 1 seconds
+Number of Alerts Detected: 1
+Number of Messages from P rank 0 with neighbor: 1
+Number of Messages from P rank 1 with neighbor: 1
+Number of Messages from P rank 2 with neighbor: 76644448
+Total Number of Messages: 76644450
+Simulation Time: 4 seconds
+Number of Alerts Detected: 2
+Number of Messages from P rank 0 with neighbor: 2
+Number of Messages from P rank 1 with neighbor: 1
+Number of Messages from P rank 2 with neighbor: 76644448
+Total Number of Messages: 76644451
+Simulation Time: 7 seconds
+Number of Alerts Detected: 3
+Number of Messages from P rank 0 with neighbor: 3
+Number of Messages from P rank 1 with neighbor: 1
+Number of Messages from P rank 2 with neighbor: 76644448
+Total Number of Messages: 76644452
+Simulation Time: 10 seconds
+Number of Alerts Detected: 4
+Number of Messages from P rank 0 with neighbor: 4
+Number of Messages from P rank 1 with neighbor: 1
+Number of Messages from P rank 2 with neighbor: 76644448
+Total Number of Messages: 76644453
+Simulation Time: 1 seconds
+Number of Alerts Detected: 1
+Number of Messages from P rank 0 with neighbor: 1
+Number of Messages from P rank 1 with neighbor: 1
+Number of Messages from P rank 2 with neighbor: 71909472
+Total Number of Messages: 71909474

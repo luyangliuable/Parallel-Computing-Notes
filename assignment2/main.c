@@ -1,7 +1,7 @@
 #include "file_logger.c"
 #include "headers.c"
-#include "random_readings_generator.c"
 #include "log_to_file.c"
+#include "random_readings_generator.c"
 #include "utility.c"
 #include <math.h>
 #include <mpi.h>
@@ -23,7 +23,8 @@ int earthquake_detection_system(int my_rank, int size, MPI_Comm master_comm,
 
 /* double compute_absolute_diff(double value1, double value2); */
 double compute_distance(int *coord1, int *coord2);
-void ground_node(MPI_Comm master_comm, int *no_of_messages_per_node, struct timespec startComp);
+void base_station(MPI_Comm master_comm, int *no_of_messages_per_node,
+                  struct timespec startComp);
 
 void *proper_shutdown_slave(void *vargp) {
   // TODO NOT WORKING!
@@ -117,7 +118,7 @@ int main(int argc, char **argv) {
   } else {
     pthread_t thread_id;
     pthread_create(&thread_id, NULL, proper_shutdown_master, NULL);
-    ground_node(MPI_COMM_WORLD, no_of_messages_per_node, startComp);
+    base_station(MPI_COMM_WORLD, no_of_messages_per_node, startComp);
   }
 
   MPI_Finalize();
@@ -126,7 +127,8 @@ int main(int argc, char **argv) {
   return 0;
 }
 
-void ground_node(MPI_Comm master_comm, int *no_of_messages_per_node, struct timespec startComp) {
+void base_station(MPI_Comm master_comm, int *no_of_messages_per_node,
+                  struct timespec startComp) {
   int no_of_alerts = 0;
   printf("ground node start.\n");
   seismic_reading reading;
@@ -217,8 +219,10 @@ int earthquake_detection_system(int my_rank, int size, MPI_Comm master_comm,
   MPI_Status receive_status[4];
 
   while (1) {
-    double earthquake_magnitude = detect_earthquake(0, 8, my_rank);
-    init_reading(&seismic_readings[c], coord[0], coord[1], 9);
+    double earthquake_magnitude = detect_earthquake(0.0, 9.0, my_rank);
+    double *earthquake_loc = get_earthquake_coord(coord, dims, my_rank);
+    /* printf("(%i, %i): Earthquake coord is %.2f, %.2f\n", coord[0], coord[1], earthquake_loc[0], earthquake_loc[1]); */
+    init_reading(&seismic_readings[c], earthquake_loc[0], earthquake_loc[1], 9);
     record_current_time(&seismic_readings[c]);
     record_magnitude(&seismic_readings[c], earthquake_magnitude);
     /* print_readings(seismic_readings[c]); */
@@ -268,9 +272,7 @@ int earthquake_detection_system(int my_rank, int size, MPI_Comm master_comm,
         // Distance in kilometers
         euclidean_distances[i] =
             distance(coord[0], coord[1], tmp_coord[0], tmp_coord[1], 'K');
-        printf("(%d, %d): Absolute difference is %.2f.\n", coord[0], coord[1],
-               absolute_difference[i]);
-        printf("(%d, %d): Distance with (%d, %d) is %.2f.\n", coord[0],
+        printf("(%d, %d): Distance with (%d, %d) is %.2fkm.\n", coord[0],
                coord[1], tmp_coord[0], tmp_coord[1], euclidean_distances[i]);
       } else {
         absolute_difference[i] = -1;
