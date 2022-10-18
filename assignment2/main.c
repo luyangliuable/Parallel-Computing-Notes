@@ -15,11 +15,13 @@
 #define SHIFT_ROW 0
 #define SHIFT_COL 1
 #define DISP 1
+#define EARTHQUAKE_THRESHOLD 5.5
+#define DISTANCE_THRESHOLD 7500
 
 int master_io(MPI_Comm master_comm, MPI_Comm comm, int size);
 int slave_io(MPI_Comm master_comm, MPI_Comm comm);
 int earthquake_detection_system(int my_rank, int size, MPI_Comm master_comm,
-                                MPI_Comm comm, int argc, char **argv);
+                                MPI_Comm comm, int *dims);
 
 /* double compute_absolute_diff(double value1, double value2); */
 double compute_distance(int *coord1, int *coord2);
@@ -36,7 +38,7 @@ void *proper_shutdown_slave(void *vargp) {
 }
 
 void *proper_shutdown_master(void *vargp) {
-  printf("Press q Key to quit program.\n");
+  printf("Press q + ENTER to quit program.\n");
 
   int size;
   int q = 1;
@@ -71,11 +73,9 @@ int main(int argc, char **argv) {
 
   struct timespec start, end, startComp, endComp;
 
-  clock_gettime(CLOCK_MONOTONIC, &startComp);
-
   int rank, size;
   MPI_Comm new_comm;
-  MPI_Init(&argc, &argv);
+  MPI_Init(NULL, NULL);
 
   /*
    * The size is the number of processes
@@ -84,6 +84,26 @@ int main(int argc, char **argv) {
    */
   MPI_Comm_size(MPI_COMM_WORLD, &size);
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+
+  int *dims = malloc(sizeof(int));
+  int nrows, ncols;
+
+  if (argc == 3) {
+    dims[0] = atoi(argv[1]); /* number of rows */
+    dims[1] = atoi(argv[2]); /* number of columns */
+
+    if ((dims[0] * dims[1]) != size - 1) {
+      if (rank == 0)
+        printf("ERROR: nrows*ncols=%d * %d = %d != %d\n", dims[0], dims[1],
+               dims[0] * dims[1], size - 1);
+      MPI_Finalize();
+      return 0;
+    }
+  } else {
+    nrows = ncols = (int)sqrt(size);
+    dims[0] = dims[1] = 0;
+  }
+  clock_gettime(CLOCK_MONOTONIC, &startComp);
 
   int no_of_messages_per_node[size];
   no_of_messages_per_node[0] = 0;
@@ -113,8 +133,7 @@ int main(int argc, char **argv) {
     /* pthread_create(&thread_id, NULL, proper_shutdown_slave, NULL); */
 
     MPI_Comm_size(new_comm, &size2);
-    earthquake_detection_system(rank, size - 1, MPI_COMM_WORLD, new_comm, argc,
-                                argv);
+    earthquake_detection_system(rank, size - 1, MPI_COMM_WORLD, new_comm, dims);
   } else {
     pthread_t thread_id;
     pthread_create(&thread_id, NULL, proper_shutdown_master, NULL);
@@ -123,6 +142,7 @@ int main(int argc, char **argv) {
 
   MPI_Finalize();
 
+  free(dims);
   free(groups_to_incl);
   return 0;
 }
@@ -156,7 +176,7 @@ void base_station(MPI_Comm master_comm, int *no_of_messages_per_node,
 }
 
 int earthquake_detection_system(int my_rank, int size, MPI_Comm master_comm,
-                                MPI_Comm comm, int argc, char **argv) {
+                                MPI_Comm comm, int *dims) {
   double absolute_difference[4];
   double euclidean_distances[4];
   int ndims = 2, reorder, my_cart_rank, ierr;
@@ -164,27 +184,8 @@ int earthquake_detection_system(int my_rank, int size, MPI_Comm master_comm,
   int nbr_i_lo, nbr_i_hi;
   int nbr_j_lo, nbr_j_hi;
   MPI_Comm comm2D;
-  int dims[ndims], coord[ndims];
+  int coord[ndims];
   int wrap_around[ndims];
-
-  /* process command line arguments*/
-  if (argc == 3) {
-    nrows = atoi(argv[1]);
-    ncols = atoi(argv[2]);
-    dims[0] = nrows; /* number of rows */
-    dims[1] = ncols; /* number of columns */
-
-    if ((nrows * ncols) != size) {
-      if (my_rank == 0)
-        printf("ERROR: nrows*ncols)=%d * %d = %d != %d\n", nrows, ncols,
-               nrows * ncols, size);
-      MPI_Finalize();
-      return 0;
-    }
-  } else {
-    nrows = ncols = (int)sqrt(size);
-    dims[0] = dims[1] = 0;
-  }
 
   MPI_Dims_create(size, ndims, dims);
   if (my_rank == 1)
@@ -200,18 +201,23 @@ int earthquake_detection_system(int my_rank, int size, MPI_Comm master_comm,
   if (ierr != 0)
     printf("ERROR[%d] creating CART\n", ierr);
 
+  /* MPI_Cart_rank(comm2D, coord, &my_cart_rank); */
+  /***************************************************************************/
+  /*       Update the new rank and coord to match current communicator       */
+  /***************************************************************************/
+  MPI_Comm_rank(comm2D, &my_rank);
   MPI_Cart_coords(comm2D, my_rank, ndims,
                   coord); // coordinate is returned into the coord array
-  /* MPI_Cart_rank(comm2D, coord, &my_cart_rank); */
 
+  // Getting neighboring ranks
   MPI_Cart_shift(comm2D, SHIFT_ROW, DISP, &nbr_i_lo, &nbr_i_hi);
   MPI_Cart_shift(comm2D, SHIFT_COL, DISP, &nbr_j_lo, &nbr_j_hi);
 
   int neighbour_ranks[4] = {nbr_i_lo, nbr_i_hi, nbr_j_lo, nbr_j_hi};
-  double recv_vals[4];
+  seismic_reading recv_vals[4];
+  memset(recv_vals, 0, 4);
 
-  seismic_reading seismic_readings[100];
-  int c = 0;
+  seismic_reading seismic_readings[size];
 
   MPI_Request send_request[4];
   MPI_Request receive_request[4];
@@ -221,72 +227,81 @@ int earthquake_detection_system(int my_rank, int size, MPI_Comm master_comm,
   while (1) {
     double earthquake_magnitude = detect_earthquake(0.0, 9.0, my_rank);
     double *earthquake_loc = get_earthquake_coord(coord, dims, my_rank);
-    /* printf("(%i, %i): Earthquake coord is %.2f, %.2f\n", coord[0], coord[1], earthquake_loc[0], earthquake_loc[1]); */
-    init_reading(&seismic_readings[c], earthquake_loc[0], earthquake_loc[1], 9);
-    record_current_time(&seismic_readings[c]);
-    record_magnitude(&seismic_readings[c], earthquake_magnitude);
-    /* print_readings(seismic_readings[c]); */
-    MPI_Datatype MPI_SEISMIC_READING =
-        create_root_datatype(seismic_readings[c]);
-    MPI_Send(&seismic_readings[c], 1, MPI_SEISMIC_READING, 0, 0, master_comm);
+    unsigned int seed = time(NULL);
+    double depth = generate_rand(1, 9, 2, &seed);
+    init_reading(&seismic_readings[my_rank], earthquake_loc[0],
+                 earthquake_loc[1], depth);
+    record_current_time(&seismic_readings[my_rank]);
+    record_magnitude(&seismic_readings[my_rank], earthquake_magnitude);
 
+    // Used to print_reading here
+    MPI_Datatype MPI_SEISMIC_READING =
+        create_root_datatype(seismic_readings[my_rank]);
+
+    // TODO one thread for send one thread for receive?
     for (int i = 0; i < sizeof(neighbour_ranks) / sizeof(int); i++) {
-      MPI_Isend(&earthquake_magnitude, 1, MPI_DOUBLE, neighbour_ranks[i], 0,
-                comm2D, &send_request[i]);
+      MPI_Isend(&seismic_readings[my_rank], 1, MPI_SEISMIC_READING,
+                neighbour_ranks[i], 0, comm2D, &send_request[i]);
     }
 
-    recv_vals[0] = -1;
-    recv_vals[1] = -1;
-    recv_vals[2] = -1;
-    recv_vals[3] = -1;
-
     for (int i = 0; i < sizeof(neighbour_ranks) / sizeof(int); i++) {
-      MPI_Irecv(&recv_vals[i], 1, MPI_DOUBLE, neighbour_ranks[i], 0, comm2D,
-                &receive_request[i]);
+      MPI_Irecv(&recv_vals[i], 1, MPI_SEISMIC_READING, neighbour_ranks[i], 0,
+                comm2D, &receive_request[i]);
     }
 
     MPI_Waitall(4, send_request, send_status);
     MPI_Waitall(4, receive_request, receive_status);
 
+    /*************************************************************************/
+    /*                        Compare with neighbors                         */
+    /*************************************************************************/
+    int earthquake_detected_flag = 0;
     for (int i = 0; i < sizeof(neighbour_ranks) / sizeof(int); i++) {
-      if (recv_vals[i] == earthquake_magnitude) {
+      if (recv_vals[i].magnitude == earthquake_magnitude) {
         printf("rank %i and %i have equal magnitude %.2f.\n", my_rank,
                neighbour_ranks[i], earthquake_magnitude);
         log_file(my_rank, neighbour_ranks[i], earthquake_magnitude);
       }
-    }
 
-    /***********************************************************************/
-    /*                    Calculate absolute differences                   */
-    /***********************************************************************/
-    for (int i = 0; i < size; i++) {
-      int tmp_coord[2];
-      if (recv_vals[i] > 0 && i != my_rank) {
-        MPI_Cart_coords(
-            comm2D, i, ndims,
-            tmp_coord); // coordinate is returned into the coord array
+      /***********************************************************************/
+      /*                    Calculate absolute differences                   */
+      /***********************************************************************/
+      if (i != my_rank && neighbour_ranks[i] != -2) {
+        int tmp_coord[2];
 
-        absolute_difference[i] =
-            compute_absolute_diff(earthquake_magnitude, recv_vals[i]);
+        // Getting coords from neighboring ranks
+        MPI_Cart_coords(comm2D, neighbour_ranks[i], ndims, tmp_coord);
 
-        // Distance in kilometers
-        euclidean_distances[i] =
-            distance(coord[0], coord[1], tmp_coord[0], tmp_coord[1], 'K');
-        printf("(%d, %d): Distance with (%d, %d) is %.2fkm.\n", coord[0],
-               coord[1], tmp_coord[0], tmp_coord[1], euclidean_distances[i]);
-      } else {
-        absolute_difference[i] = -1;
-        euclidean_distances[i] = -1;
+        double dist =
+            distance(earthquake_loc[0], earthquake_loc[1],
+                     recv_vals[i].latitude, recv_vals[i].longitude, 'K');
+
+        /* printf("(%i, %i) %i: Distance with (%d, %d) rank %i is %.2fkm.\n", */
+        /*        coord[0], coord[1], my_rank, tmp_coord[0], tmp_coord[1], */
+        /*        neighbour_ranks[i], dist); */
+
+        if (earthquake_magnitude > EARTHQUAKE_THRESHOLD && recv_vals[i].magnitude > EARTHQUAKE_THRESHOLD) {
+          earthquake_detected_flag = 1;
+        }
       }
+
     }
 
-    printf("Global rank: %d. Coord: (%d, %d). Magnitude: %.2f. "
-           "Recv Top: %.2f. Recv Bottom: %.2f. Recv Left: %.2f. Recv Right: "
-           "%.2f.\n",
-           my_rank, coord[0], coord[1], earthquake_magnitude, recv_vals[0],
-           recv_vals[1], recv_vals[2], recv_vals[3]);
-    sleep(1);
-    c++;
+    if(earthquake_detected_flag) {
+      // TODO only send to base station when there is actually a detection of
+      // earthquake. Compare with neighbouring nodes
+      printf("Rank %i, EARTHQUAKE DETECTED with magnitude %.2f.\n", my_rank, earthquake_magnitude);
+      MPI_Send(&seismic_readings[my_rank], 1, MPI_SEISMIC_READING, 0, 0,
+               master_comm);
+    }
+
+    /* printf("Global rank: %d. Coord: (%d, %d). Magnitude: %.2f. " */
+    /*        "Recv Top: %.2f. Recv Bottom: %.2f. Recv Left: %.2f. Recv Right: " */
+    /*        "%.2f.\n", */
+    /*        my_rank, coord[0], coord[1], earthquake_magnitude, */
+    /*        recv_vals[0].magnitude, recv_vals[1].magnitude, */
+    /*        recv_vals[2].magnitude, recv_vals[3].magnitude); */
+    /* sleep(1); */
   }
 
   MPI_Comm_free(&comm2D);

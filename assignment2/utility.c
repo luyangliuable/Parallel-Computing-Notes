@@ -5,6 +5,7 @@
 #include <time.h>
 #include <unistd.h>
 #define pi 3.14159265358979323846
+/* #include <mpi.h> */
 
 typedef struct {
   double lat;

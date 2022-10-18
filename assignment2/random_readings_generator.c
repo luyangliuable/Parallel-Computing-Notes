@@ -27,8 +27,6 @@ double generate_rand(double lo, double hi, int decimal_place, unsigned int *seed
 
   num = num / precision;
 
-  printf("%i, %i, %.2f\n", low, high, num);
-
   return num;
 }
 

@@ -24,24 +24,25 @@ typedef struct {
 
 
 void print_readings(seismic_reading new_reading) {
-  printf("╔═════════════════════════════════════════════════════════════════"
+  printf("╔════════════════════════════════════════════════════════════════════"
          "════╗"
          "\n");
-  printf("║ YYYY ║ MM ║ DD ║ HH ║ MM ║ SS ║ Lat ║ Long ║ Magnitude ║ Depth "
+  printf("║ YYYY ║ MM ║ DD ║ HH ║ MM ║ SS ║ Lat  ║  Long  ║ Magnitude ║ Depth "
          "(km) ║\n");
   printf(
-      "║══════════════════════════════════════════════════════════════════"
+      "║═════════════════════════════════════════════════════════════════════"
       "═══║"
       "\n");
   printf("║ %04d ║ %02d ║ %02d ║ %02d ║ %02d ║ %02d ║%.2f ║ %.2f ║    %.2f   ║    "
-         "%.2f    ║\n",
+         "%.2f   ║\n",
          new_reading.year + 1900, new_reading.month, new_reading.day,
          new_reading.hour, new_reading.minute, new_reading.second,
          new_reading.latitude, new_reading.longitude, new_reading.magnitude,
          new_reading.depth);
-  printf("╚══════════════════════════════════════════════════════════════════"
-         "═══╝"
-         "\n");
+  printf(
+      "╚═════════════════════════════════════════════════════════════════════"
+      "═══╝"
+      "\n");
 }
 
 int record_current_time(seismic_reading *reading) {
