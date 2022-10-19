@@ -1,3 +1,4 @@
+#include "file_logger.c"
 #include "headers.h"
 #include "log_to_file.c"
 #include "random_readings_generator.c"
@@ -20,19 +21,7 @@
 // Default earthquake threshold;
 double EARTHQUAKE_THRESHOLD = 5.5;
 double DISTANCE_THRESHOLD = 7500;
-
-/*
- * Argument to put inside struct for thread to see.
- */
-typedef struct {
-  seismic_reading *reading_ptr;
-  MPI_Datatype MPI_SEISMIC_READING;
-  MPI_Comm master_comm;
-  int *no_of_alerts;
-  struct timespec startComp;
-  int *count_buffer;
-  int size;
-} thread_args_base;
+double **glob_array;
 
 /*
  * Argument to put inside struct for thread to see.
@@ -42,30 +31,43 @@ typedef struct {
   MPI_Datatype MPI_SEISMIC_READING;
   MPI_Comm comm_2D;
   int neighbour_ranks[NO_OF_NEIGHBOURS];
-} thread_args_ground;
-
-double **shared_global_array;
+} threadargs;
 
 /*****************************************************************************/
 /*                            Prototype Functions                            */
 /*****************************************************************************/
-int earthquake_detection_system(int my_rank, int size, MPI_Comm master_comm,
-                                MPI_Comm comm, int *dims, int msg_count,
-                                int *count_buffer);
-void periodic_detection(int *coord, int ndims, int *dims, int my_rank, int size,
-                        int *neighbour_ranks, MPI_Comm comm2D);
-void base_station(MPI_Comm master_comm, struct timespec startComp, int size,
-                  int msg_count, int *count_buffer);
-void get_user_arguments(int size, int rank, int argc, char **argv, int *dims,
-                        int *nrows, int *ncols);
+int earthquake_detection_system(int my_rank, int size, MPI_Comm master_comm, MPI_Comm comm, int *dims, int msg_count, int *count_buffer);
+void periodic_detection(int *coord, int ndims, int *dims, int my_rank, int size, int *neighbour_ranks, MPI_Comm comm2D);
+void base_station(MPI_Comm master_comm, struct timespec startComp, int size, int msg_count, int *count_buffer);
+void get_user_arguments(int size, int rank, int argc, char **argv, int *dims, int *nrows, int *ncols);
 double compute_distance(int *coord1, int *coord2);
 int master_io(MPI_Comm master_comm, MPI_Comm comm, int size);
 int slave_io(MPI_Comm master_comm, MPI_Comm comm);
 void *init_threshold_values(int rank);
-void log_to_file(double time, int no_of_alerts_detected,
-                 seismic_reading reading, int *no_of_messages, int size);
 
-void *balloon_sensor(void *vargp) { exit(0); }
+void *balloon_sensor(void *vargp) {
+  int min = 0.0, max = 9.0;
+  int coord[] = {0,0};
+  int dims[] = {5,5};
+  extern double **glob_array;
+  double count = 1;
+  double max_count = 20;
+  // Randomise coordinates and magnitude
+  glob_array[0][0] = count;
+  while(1) {
+    int counter = count;
+    glob_array[0][0] = count;
+    glob_array[counter][0] = detect_earthquake(min, max, 10);
+    double *coords = get_earthquake_coord(coord, dims, 10);
+    glob_array[counter][1] = coords[0];
+    glob_array[counter][2] = coords[1];
+  
+    if (count == max_count + 1)
+      count = 0;
+    else count++;
+    sleep(1);
+  }
+}
 
 void *proper_shutdown_slave(void *vargp) {
   // TODO NOT WORKING!
@@ -82,7 +84,6 @@ void *proper_shutdown_slave(void *vargp) {
 void *proper_shutdown_master(void *vargp) {
   printf("Press q + ENTER to quit program.\n");
 
-  int size;
   int q = 1;
 
   while (1) {
@@ -91,7 +92,6 @@ void *proper_shutdown_master(void *vargp) {
     if (c == 'q' || c == 'Q') {
       for (int i = 1; i < 8; i++)
         MPI_Send(&q, 1, MPI_INT, i, 1, MPI_COMM_WORLD);
-
       printf("Quiting.\n");
 
       MPI_Finalize();
@@ -101,51 +101,9 @@ void *proper_shutdown_master(void *vargp) {
   }
 }
 
-void *thread_recv(void *vargs) {
-  thread_args_base *params;
-  params = (thread_args_base *)vargs;
-  MPI_Status status;
-
-  int tmp = 1;
-  MPI_Recv(params->reading_ptr, 1, params->MPI_SEISMIC_READING, MPI_ANY_SOURCE,
-           0, MPI_COMM_WORLD, &status);
-  /* printf("%.4lf.\n", ( *( params->reading_ptr ) ).magnitude); */
-  /* At this point received an alert */
-
-  (*(params->no_of_alerts))++;
-
-  print_readings(*(params->reading_ptr));
-
-  /* printf("%i.\n", ( *( params->reading_ptr ) ).no_of_messages[1]); */
-
-  /*************************************************************************/
-  /*                       Calculate simulation time                       */
-  /*************************************************************************/
-  struct timespec curr_time;
-  clock_gettime(CLOCK_MONOTONIC, &curr_time);
-
-  double time_taken = (curr_time.tv_sec - params->startComp.tv_sec) * 1e9;
-  time_taken =
-      (time_taken + (curr_time.tv_nsec - params->startComp.tv_nsec)) * 1e-9;
-
-  /* printf( */
-  /*     "time taken %.2f, count buffer %i, no of alerts %i, size, size %i.\n",
-   */
-  /*     time_taken, params->count_buffer[2], *(params->no_of_alerts), */
-  /*     params->size); */
-
-  /* printf("Base threading SUCCESSFUL!!!"); */
-  printf("Simulation time %.2f.\n", time_taken);
-  printf("Simulation time %.2f.\n", time_taken);
-  log_to_file(time_taken, *(params->no_of_alerts), *(params->reading_ptr),
-              params->count_buffer, params->size);
-
-  free(params->reading_ptr);
-}
-
 void *thread_send_all(void *vargs) {
-  thread_args_ground *params;
-  params = (thread_args_ground *)vargs;
+  threadargs *params;
+  params = (threadargs *)vargs;
   printf("Creating thread to send.....\n");
 
   for (int i = 0; i < 4; i++) {
@@ -169,7 +127,7 @@ int main(int argc, char **argv) {
    * @return     return 0
    */
 
-  struct timespec start, end, startComp, endComp;
+  struct timespec startComp;
 
   int rank, size;
   MPI_Comm new_comm;
@@ -190,9 +148,7 @@ int main(int argc, char **argv) {
     pthread_t thread_id;
     double tmp_x;
     double tmp_y;
-
     pthread_create(&thread_id, NULL, proper_shutdown_master, NULL);
-
     printf("Please enter the threshold magnitude for earthquake (For default "
            "enter 0):\n");
     scanf("%lf", &tmp_x);
@@ -211,8 +167,7 @@ int main(int argc, char **argv) {
       DISTANCE_THRESHOLD = tmp_y;
     }
 
-    /* printf("New distance threshold  is %.2lf.\n", DISTANCE_THRESHOLD); */
-    /* pthread_join(thread_id, NULL); */
+    printf("New distance threshold  is %.2lf.\n", DISTANCE_THRESHOLD);
   }
 
   MPI_Barrier(MPI_COMM_WORLD);
@@ -236,9 +191,6 @@ int main(int argc, char **argv) {
   }
 
   MPI_Group_incl(old_group, size - 1, groups_to_incl, &group);
-
-  free(groups_to_incl);
-
   MPI_Comm_create(MPI_COMM_WORLD, group, &new_comm);
 
   int cart_size;
@@ -249,8 +201,8 @@ int main(int argc, char **argv) {
 
   if (rank != 0) {
     // TODO slave shutdown gives segmentation fault 11
-    /* pthread_t thread_id_slave; */
-    /* pthread_create(&thread_id_slave, NULL, proper_shutdown_slave, NULL); */
+    pthread_t thread_id_slave;
+    pthread_create(&thread_id_slave, NULL, proper_shutdown_slave, NULL);
 
     MPI_Comm_size(new_comm, &cart_size);
 
@@ -261,9 +213,6 @@ int main(int argc, char **argv) {
     /*************************************************************************/
     /*                       Root Rank and Base Station */
     /*************************************************************************/
-
-    shared_global_array = malloc(sizeof(double *) * dims[0]);
-    *shared_global_array = malloc(sizeof(double) * dims[1]);
 
     base_station(MPI_COMM_WORLD, startComp, size, msg_count, count_buffer);
   }
@@ -280,6 +229,11 @@ void base_station(MPI_Comm master_comm, struct timespec startComp, int size,
   int no_of_alerts = 0;
   printf("ground node start.\n");
   seismic_reading reading;
+  extern double **glob_array;
+  glob_array = malloc(sizeof(double *) * 20);
+  *glob_array = malloc(sizeof(double) * 3);
+  pthread_t thread_id_balloon;
+  pthread_create(&thread_id_balloon, NULL, balloon_sensor, NULL);
 
   MPI_Datatype MPI_SEISMIC_READING = create_root_datatype(reading, size);
   MPI_Status status;
@@ -288,53 +242,44 @@ void base_station(MPI_Comm master_comm, struct timespec startComp, int size,
               MPI_COMM_WORLD);
 
   while (1) {
-    pthread_t thread_id;
     MPI_Gather(&msg_count, 1, MPI_INT, count_buffer, 1, MPI_INT, 0,
                MPI_COMM_WORLD);
 
-    thread_args_base thread_args;
-    thread_args.MPI_SEISMIC_READING = MPI_SEISMIC_READING;
+    for (int i = 0; i < size; i++) {
+      printf("%i.\n", count_buffer[i]);
+    }
+    MPI_Recv(&reading, 1, MPI_SEISMIC_READING, MPI_ANY_SOURCE, 0, master_comm,
+             &status);
 
-    // This fixed segmentation fault!!!
-    /* ♪┏(・o･)┛♪┗ (･o･) ┓♪ */
+    (msg_count)++;
+    printf("%i.\n", reading.no_of_messages[1]);
+    // TODO compare with seismic balloon sensor
+    int balloon_count = glob_array[0][0];
+    double *balloon_reading = glob_array[balloon_count];
+    double dist = distance(balloon_reading[1], balloon_reading[2],
+                     reading.latitude, reading.longitude, 'K');
+    
+    if (balloon_reading[0] - reading.magnitude < EARTHQUAKE_THRESHOLD &&
+      dist < DISTANCE_THRESHOLD) {
+        // Conclusive alert
+        printf("Balloon: %f mag, %f lat, %f long\nNode: %f mag, %f lat, %f long",
+          balloon_reading[0], balloon_reading[1], balloon_reading[2],
+          reading.magnitude, reading.latitude, reading.longitude);
+        print_readings(reading);
+        no_of_alerts++;
+        
+    } else {
+    // Inconclusive alert
+    }
 
-    thread_args.reading_ptr = malloc(sizeof(seismic_reading));
-    *(thread_args.reading_ptr) = reading;
+    struct timespec curr_time;
+    clock_gettime(CLOCK_MONOTONIC, &curr_time);
+    double time_taken = (curr_time.tv_sec - startComp.tv_sec) * 1e9;
+    time_taken = (time_taken + (curr_time.tv_nsec - startComp.tv_nsec)) * 1e-9;
 
-    thread_args.count_buffer = malloc(sizeof(int) * size);
-    thread_args.count_buffer = count_buffer;
-    thread_args.master_comm = master_comm;
-    thread_args.no_of_alerts = &no_of_alerts;
-    thread_args.size = size;
-    thread_args.startComp = startComp;
+    log_to_file(time_taken, no_of_alerts, reading, count_buffer, size);
 
-    pthread_create(&thread_id, NULL, thread_recv, (void *)&thread_args);
-
-    /* MPI_Recv(&reading, 1, MPI_SEISMIC_READING, MPI_ANY_SOURCE, 0,
-       master_comm, */
-    /*          &status); */
-    /* print_readings(reading); */
-
-    /* (msg_count)++; */
-    /* printf("%i.\n", reading.no_of_messages[1]); */
-
-    /* no_of_alerts++; */
-    /* // TODO compare with seismic balloon sensor */
-    /* // If match, conclusive alert */
-    /* // Else, inconclusive alert */
-
-    /* struct timespec curr_time; */
-    /* clock_gettime(CLOCK_MONOTONIC, &curr_time); */
-    /* double time_taken = (curr_time.tv_sec - startComp.tv_sec) * 1e9;
-     */
-    /* time_taken = (time_taken + (curr_time.tv_nsec -
-       startComp.tv_nsec)) * 1e-9; */
-
-    /* log_to_file(time_taken, no_of_alerts, reading,
-       count_buffer, size); */
-
-    pthread_join(thread_id, NULL);
-    sleep(2);
+    sleep(1);
   }
 }
 
@@ -459,9 +404,8 @@ void periodic_detection(int *coord, int ndims, int *dims, int my_rank, int size,
     /*************************************************************************/
     /*                       Initiated thread arguments */
     /*************************************************************************/
-    thread_args_ground thread_arguments;
-    thread_arguments.reading = malloc(sizeof(seismic_reading));
-    *(thread_arguments.reading) = (seismic_readings[my_rank]);
+    threadargs thread_arguments;
+    thread_arguments.reading = &(seismic_readings[my_rank]);
     thread_arguments.comm_2D = comm2D;
 
     for (int i = 0; i < 4; i++) {
@@ -494,7 +438,7 @@ void periodic_detection(int *coord, int ndims, int *dims, int my_rank, int size,
       if (recv_vals[i].magnitude == earthquake_magnitude) {
         printf("rank %i and %i have equal magnitude %.2f.\n", my_rank,
                neighbour_ranks[i], earthquake_magnitude);
-        /* log_file(my_rank, neighbour_ranks[i], earthquake_magnitude); */
+        log_file(my_rank, neighbour_ranks[i], earthquake_magnitude);
       }
 
       /***********************************************************************/
@@ -586,47 +530,4 @@ void *init_threshold_values(int rank) {
 
     printf("New distance threshold  is %.2lf.\n", DISTANCE_THRESHOLD);
   }
-}
-
-void log_to_file(double time, int no_of_alerts_detected,
-                 seismic_reading reading, int *no_of_messages, int size) {
-  /**
-   * @brief      Output the result into result-tasknumber.txt file
-   *
-   * @details    Saves the wait, turnaround, deadline met informations.
-   *
-   * @param      time - The current time
-   *
-   * @param      current - the current index
-   *
-   * @param      deadline_met - boolean indicating whether deadline is met.
-   *
-   * @param      task_number - string task number result is from.
-   */
-
-  char *file_name = "logs.txt";
-
-  int total_no_of_messages = 0;
-
-  /* printf("Time taken %.2f, count buffer %i, no of alerts %i, size, size
-   * %i.\n", time, no_of_messages[2], no_of_alerts_detected, size); */
-
-  /***************************************************************************/
-  /*                          Append to output file */
-  /***************************************************************************/
-  FILE *file = fopen(file_name, "a+");
-
-  fprintf(file, "Simulation Time: %.2f seconds\n", time);
-  fprintf(file, "Number of Alerts Detected: %i\n", no_of_alerts_detected);
-  fprintf(file, "Number of Messages from base station : %i\n",
-          no_of_messages[0]);
-  for (int i = 1; i < size; i++) {
-    fprintf(file, "Number of Messages from P rank %i with neighbor: %i\n", i,
-            no_of_messages[i]);
-    total_no_of_messages += no_of_messages[i];
-  }
-  fprintf(file, "Total Number of Messages: %i\n", total_no_of_messages);
-  fclose(file);
-
-  printf("Base threading SUCCESSFUL!!!\n");
 }
