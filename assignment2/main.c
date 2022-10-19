@@ -15,12 +15,12 @@
 #define SHIFT_ROW 0
 #define SHIFT_COL 1
 #define DISP 1
-#define DISTANCE_THRESHOLD 7500
 #define ROOT_RANK 0
 #define NO_OF_NEIGHBOURS 4
 
 // Default earthquake threshold;
 double EARTHQUAKE_THRESHOLD = 5.5;
+double DISTANCE_THRESHOLD = 7500;
 
 /*
  * Argument to put inside struct for thread to see.
@@ -44,7 +44,7 @@ void get_user_arguments(int size, int rank, int argc, char **argv, int *dims, in
 double compute_distance(int *coord1, int *coord2);
 int master_io(MPI_Comm master_comm, MPI_Comm comm, int size);
 int slave_io(MPI_Comm master_comm, MPI_Comm comm);
-
+void *init_threshold_values(int rank);
 
 void *balloon_sensor(void *vargp) { exit(0); }
 
@@ -126,14 +126,28 @@ int main(int argc, char **argv) {
 
   if (rank == 0) {
     pthread_t thread_id;
-    double tmp;
+    double tmp_x;
+    double tmp_y;
     pthread_create(&thread_id, NULL, proper_shutdown_master, NULL);
-    printf("Please enter the threshold magnitude for earthquake (For default enter 0):\n");
-    scanf("%lf", &tmp);
-    if (tmp) {
-      EARTHQUAKE_THRESHOLD = tmp;
+    printf("Please enter the threshold magnitude for earthquake (For default "
+           "enter 0):\n");
+    scanf("%lf", &tmp_x);
+    if (tmp_x) {
+      EARTHQUAKE_THRESHOLD = tmp_x;
     }
-    printf("New earthquake threshold magnitude is %.2lf.\n", EARTHQUAKE_THRESHOLD);
+    printf("New earthquake threshold magnitude is %.2lf.\n",
+           EARTHQUAKE_THRESHOLD);
+
+    printf("Please enter the threshold distance for detection (For default "
+           "%.2f enter 0):\n",
+           DISTANCE_THRESHOLD);
+    scanf("%lf", &tmp_y);
+
+    if (tmp_y) {
+      DISTANCE_THRESHOLD = tmp_y;
+    }
+
+    printf("New distance threshold  is %.2lf.\n", DISTANCE_THRESHOLD);
   }
 
   MPI_Barrier(MPI_COMM_WORLD);
@@ -182,7 +196,6 @@ int main(int argc, char **argv) {
 
     shared_global_array = malloc(sizeof(double *) * dims[0]);
     *shared_global_array = malloc(sizeof(double) * dims[1]);
-
 
     base_station(MPI_COMM_WORLD, startComp, size, msg_count, count_buffer);
   }
@@ -355,7 +368,7 @@ void periodic_detection(int *coord, int ndims, int *dims, int my_rank, int size,
 
     msg_count += NO_OF_NEIGHBOURS;
     /*************************************************************************/
-    /*                       Initiated thread arguments                      */
+    /*                       Initiated thread arguments */
     /*************************************************************************/
     threadargs thread_arguments;
     thread_arguments.reading = &(seismic_readings[my_rank]);
@@ -454,5 +467,33 @@ void periodic_detection(int *coord, int ndims, int *dims, int my_rank, int size,
            recv_vals[0].magnitude, recv_vals[1].magnitude,
            recv_vals[2].magnitude, recv_vals[3].magnitude);
     sleep(2);
+  }
+}
+
+void *init_threshold_values(int rank) {
+  if (rank == 0) {
+    pthread_t thread_id;
+    double tmp_x;
+    double tmp_y;
+    pthread_create(&thread_id, NULL, proper_shutdown_master, NULL);
+    printf("Please enter the threshold magnitude for earthquake (For default "
+           "enter 0):\n");
+    scanf("%lf", &tmp_x);
+    if (tmp_x) {
+      EARTHQUAKE_THRESHOLD = tmp_x;
+    }
+    printf("New earthquake threshold magnitude is %.2lf.\n",
+           EARTHQUAKE_THRESHOLD);
+
+    printf("Please enter the threshold distance for detection (For default "
+           "%.2f enter 0):\n",
+           DISTANCE_THRESHOLD);
+    scanf("%lf", &tmp_y);
+
+    if (tmp_y) {
+      DISTANCE_THRESHOLD = tmp_y;
+    }
+
+    printf("New distance threshold  is %.2lf.\n", DISTANCE_THRESHOLD);
   }
 }
