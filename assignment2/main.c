@@ -19,9 +19,20 @@
 #define DISTANCE_THRESHOLD 7500
 #define ROOT_RANK 0
 
+/*
+ * Argument to put inside struct for thread to see.
+ */
+typedef struct {
+  seismic_reading *reading;
+  MPI_Datatype MPI_SEISMIC_READING;
+  MPI_Comm comm_2D;
+  int neighbour_ranks[4];
+} threadargs;
+
 double **shared_global_array;
 
-void periodic_detection(int *coord, int ndims, int *dims, int my_rank, int size, int *neighbour_ranks, MPI_Comm comm2D);
+void periodic_detection(int *coord, int ndims, int *dims, int my_rank, int size,
+                        int *neighbour_ranks, MPI_Comm comm2D);
 
 void get_user_arguments(int size, int rank, int argc, char **argv, int *dims,
                         int *nrows, int *ncols);
@@ -68,6 +79,18 @@ void *proper_shutdown_master(void *vargp) {
       exit(0);
     }
     sleep(1);
+  }
+}
+
+void *thread_send_all(void *vargs) {
+  threadargs *params;
+  params = (threadargs *) vargs;
+  printf("Creating thread to send.....\n");
+
+  for (int i = 0; i < 4; i++) {
+    MPI_Send((params->reading), 1, params->MPI_SEISMIC_READING,
+             (params->neighbour_ranks)[i], 0, params->comm_2D);
+    /* (msg_count)++; */
   }
 }
 
@@ -169,10 +192,12 @@ void base_station(MPI_Comm master_comm, struct timespec startComp, int size,
   MPI_Datatype MPI_SEISMIC_READING = create_root_datatype(reading, size);
   MPI_Status status;
 
-  MPI_Scatter(count_buffer, 1, MPI_INT, &msg_count, 1, MPI_INT, 0, MPI_COMM_WORLD);
+  MPI_Scatter(count_buffer, 1, MPI_INT, &msg_count, 1, MPI_INT, 0,
+              MPI_COMM_WORLD);
 
   while (1) {
-    MPI_Gather(&msg_count, 1, MPI_INT, count_buffer, 1, MPI_INT, 0, MPI_COMM_WORLD);
+    MPI_Gather(&msg_count, 1, MPI_INT, count_buffer, 1, MPI_INT, 0,
+               MPI_COMM_WORLD);
 
     for (int i = 0; i < size; i++) {
       printf("%i.\n", count_buffer[i]);
@@ -200,7 +225,9 @@ void base_station(MPI_Comm master_comm, struct timespec startComp, int size,
   }
 }
 
-int earthquake_detection_system(int my_rank, int size, MPI_Comm master_comm, MPI_Comm comm, int *dims, int msg_count, int *count_buffer) {
+int earthquake_detection_system(int my_rank, int size, MPI_Comm master_comm,
+                                MPI_Comm comm, int *dims, int msg_count,
+                                int *count_buffer) {
 
   int ndims = 2, reorder, ierr;
   int nbr_i_lo, nbr_i_hi;
@@ -240,8 +267,8 @@ int earthquake_detection_system(int my_rank, int size, MPI_Comm master_comm, MPI
 
   int neighbour_ranks[4] = {nbr_i_lo, nbr_i_hi, nbr_j_lo, nbr_j_hi};
 
-
-  periodic_detection(coord, ndims, dims, my_rank, size, neighbour_ranks, comm2D);
+  periodic_detection(coord, ndims, dims, my_rank, size, neighbour_ranks,
+                     comm2D);
 
   MPI_Comm_free(&comm2D);
   MPI_Finalize();
@@ -267,8 +294,8 @@ void get_user_arguments(int size, int rank, int argc, char **argv, int *dims,
   }
 }
 
-
-void periodic_detection(int *coord, int ndims, int *dims, int my_rank, int size, int *neighbour_ranks, MPI_Comm comm2D) {
+void periodic_detection(int *coord, int ndims, int *dims, int my_rank, int size,
+                        int *neighbour_ranks, MPI_Comm comm2D) {
 
   seismic_reading recv_vals[4];
   seismic_reading seismic_readings[size];
@@ -300,7 +327,9 @@ void periodic_detection(int *coord, int ndims, int *dims, int my_rank, int size,
      * Put the measurements into reading struct.
      * Also store the IP address where the reading is done.
      */
-    init_reading(&seismic_readings[my_rank], earthquake_loc[0], earthquake_loc[1], depth); record_current_time(&seismic_readings[my_rank]);
+    init_reading(&seismic_readings[my_rank], earthquake_loc[0],
+                 earthquake_loc[1], depth);
+    record_current_time(&seismic_readings[my_rank]);
 
     record_magnitude(&seismic_readings[my_rank], earthquake_magnitude);
 
@@ -312,20 +341,32 @@ void periodic_detection(int *coord, int ndims, int *dims, int my_rank, int size,
     /*
      * Send max of 4 messages, 1 with each neighboring node.
      */
+
+    /* for (int i = 0; i < 4; i++) { */
+    /*   MPI_Send(&seismic_readings[my_rank], 1, MPI_SEISMIC_READING,
+     * neighbour_ranks[i], 0, comm2D); */
+    /*   (msg_count)++; */
+    /* } */
+
+    threadargs thread_arguments;
+    thread_arguments.reading = &(seismic_readings[my_rank]);
+    thread_arguments.comm_2D = comm2D;
     for (int i = 0; i < 4; i++) {
-      MPI_Isend(&seismic_readings[my_rank], 1, MPI_SEISMIC_READING,
-                neighbour_ranks[i], 0, comm2D, &send_request[i]);
+      thread_arguments.neighbour_ranks[i] = neighbour_ranks[i];
+    }
+    thread_arguments.MPI_SEISMIC_READING = MPI_SEISMIC_READING;
+
+    pthread_t send_all_thread_id;
+    pthread_create(&send_all_thread_id, NULL, thread_send_all, (void *)&thread_arguments);
+
+    for (int i = 0; i < 4; i++) {
+      MPI_Recv(&recv_vals[i], 1, MPI_SEISMIC_READING, neighbour_ranks[i], 0,
+               comm2D, &receive_status[i]);
       (msg_count)++;
     }
 
-    for (int i = 0; i < 4; i++) {
-      MPI_Irecv(&recv_vals[i], 1, MPI_SEISMIC_READING, neighbour_ranks[i], 0,
-                comm2D, &receive_request[i]);
-      (msg_count)++;
-    }
-
-    MPI_Waitall(4, send_request, send_status);
-    MPI_Waitall(4, receive_request, receive_status);
+    /* MPI_Waitall(4, send_request, send_status); */
+    /* MPI_Waitall(4, receive_request, receive_status); */
 
     /*************************************************************************/
     /*                        Compare with neighbors */
@@ -343,7 +384,7 @@ void periodic_detection(int *coord, int ndims, int *dims, int my_rank, int size,
       }
 
       /***********************************************************************/
-      /*                    Calculate absolute differences                   */
+      /*                    Calculate absolute differences */
       /***********************************************************************/
       if (i != my_rank && neighbour_ranks[i] != -2) {
         int tmp_coord[2];
@@ -351,7 +392,9 @@ void periodic_detection(int *coord, int ndims, int *dims, int my_rank, int size,
         // Getting coords from neighboring ranks
         MPI_Cart_coords(comm2D, neighbour_ranks[i], ndims, tmp_coord);
 
-        double dist = distance(earthquake_loc[0], earthquake_loc[1], recv_vals[i].latitude, recv_vals[i].longitude, 'K');
+        double dist =
+            distance(earthquake_loc[0], earthquake_loc[1],
+                     recv_vals[i].latitude, recv_vals[i].longitude, 'K');
 
         if (earthquake_magnitude > EARTHQUAKE_THRESHOLD &&
             recv_vals[i].magnitude > EARTHQUAKE_THRESHOLD &&
@@ -389,7 +432,8 @@ void periodic_detection(int *coord, int ndims, int *dims, int my_rank, int size,
       printf("Gather in slave.\n");
 
       (msg_count)++;
-      MPI_Send(&seismic_readings[my_rank], 1, MPI_SEISMIC_READING, 0, 0, MPI_COMM_WORLD);
+      MPI_Send(&seismic_readings[my_rank], 1, MPI_SEISMIC_READING, 0, 0,
+               MPI_COMM_WORLD);
     }
 
     printf("Global rank: %d. Coord: (%d, %d). Magnitude: %.2f. "
@@ -401,3 +445,4 @@ void periodic_detection(int *coord, int ndims, int *dims, int my_rank, int size,
     sleep(2);
   }
 }
+
