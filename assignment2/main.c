@@ -26,11 +26,23 @@ double DISTANCE_THRESHOLD = 7500;
  * Argument to put inside struct for thread to see.
  */
 typedef struct {
+  seismic_reading *reading_ptr;
+  MPI_Datatype MPI_SEISMIC_READING;
+  MPI_Comm master_comm;
+  int *no_of_alerts;
+  struct timespec startComp;
+  int size;
+} thread_args_base;
+
+/*
+ * Argument to put inside struct for thread to see.
+ */
+typedef struct {
   seismic_reading *reading;
   MPI_Datatype MPI_SEISMIC_READING;
   MPI_Comm comm_2D;
   int neighbour_ranks[NO_OF_NEIGHBOURS];
-} threadargs;
+} thread_args_ground;
 
 double **shared_global_array;
 
@@ -82,8 +94,8 @@ void *proper_shutdown_master(void *vargp) {
 }
 
 void *thread_send_all(void *vargs) {
-  threadargs *params;
-  params = (threadargs *)vargs;
+  thread_args_ground *params;
+  params = (thread_args_ground *)vargs;
   printf("Creating thread to send.....\n");
 
   for (int i = 0; i < 4; i++) {
@@ -370,7 +382,7 @@ void periodic_detection(int *coord, int ndims, int *dims, int my_rank, int size,
     /*************************************************************************/
     /*                       Initiated thread arguments */
     /*************************************************************************/
-    threadargs thread_arguments;
+    thread_args_ground thread_arguments;
     thread_arguments.reading = &(seismic_readings[my_rank]);
     thread_arguments.comm_2D = comm2D;
 
