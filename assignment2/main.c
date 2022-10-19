@@ -15,9 +15,12 @@
 #define SHIFT_ROW 0
 #define SHIFT_COL 1
 #define DISP 1
-#define EARTHQUAKE_THRESHOLD 5.5
 #define DISTANCE_THRESHOLD 7500
 #define ROOT_RANK 0
+#define NO_OF_NEIGHBOURS 4
+
+// Default earthquake threshold;
+double EARTHQUAKE_THRESHOLD = 5.5;
 
 /*
  * Argument to put inside struct for thread to see.
@@ -26,26 +29,22 @@ typedef struct {
   seismic_reading *reading;
   MPI_Datatype MPI_SEISMIC_READING;
   MPI_Comm comm_2D;
-  int neighbour_ranks[4];
+  int neighbour_ranks[NO_OF_NEIGHBOURS];
 } threadargs;
 
 double **shared_global_array;
 
-void periodic_detection(int *coord, int ndims, int *dims, int my_rank, int size,
-                        int *neighbour_ranks, MPI_Comm comm2D);
-
-void get_user_arguments(int size, int rank, int argc, char **argv, int *dims,
-                        int *nrows, int *ncols);
+/*****************************************************************************/
+/*                            Prototype Functions                            */
+/*****************************************************************************/
+int earthquake_detection_system(int my_rank, int size, MPI_Comm master_comm, MPI_Comm comm, int *dims, int msg_count, int *count_buffer);
+void periodic_detection(int *coord, int ndims, int *dims, int my_rank, int size, int *neighbour_ranks, MPI_Comm comm2D);
+void base_station(MPI_Comm master_comm, struct timespec startComp, int size, int msg_count, int *count_buffer);
+void get_user_arguments(int size, int rank, int argc, char **argv, int *dims, int *nrows, int *ncols);
+double compute_distance(int *coord1, int *coord2);
 int master_io(MPI_Comm master_comm, MPI_Comm comm, int size);
 int slave_io(MPI_Comm master_comm, MPI_Comm comm);
-int earthquake_detection_system(int my_rank, int size, MPI_Comm master_comm,
-                                MPI_Comm comm, int *dims, int msg_count,
-                                int *count_buffer);
 
-/* double compute_absolute_diff(double value1, double value2); */
-double compute_distance(int *coord1, int *coord2);
-void base_station(MPI_Comm master_comm, struct timespec startComp, int size,
-                  int msg_count, int *count_buffer);
 
 void *balloon_sensor(void *vargp) { exit(0); }
 
@@ -84,7 +83,7 @@ void *proper_shutdown_master(void *vargp) {
 
 void *thread_send_all(void *vargs) {
   threadargs *params;
-  params = (threadargs *) vargs;
+  params = (threadargs *)vargs;
   printf("Creating thread to send.....\n");
 
   for (int i = 0; i < 4; i++) {
@@ -124,6 +123,20 @@ int main(int argc, char **argv) {
 
   int *dims = malloc(sizeof(int));
   int nrows, ncols;
+
+  if (rank == 0) {
+    pthread_t thread_id;
+    double tmp;
+    pthread_create(&thread_id, NULL, proper_shutdown_master, NULL);
+    printf("Please enter the threshold magnitude for earthquake (For default enter 0):\n");
+    scanf("%lf", &tmp);
+    if (tmp) {
+      EARTHQUAKE_THRESHOLD = tmp;
+    }
+    printf("New earthquake threshold magnitude is %.2lf.\n", EARTHQUAKE_THRESHOLD);
+  }
+
+  MPI_Barrier(MPI_COMM_WORLD);
 
   get_user_arguments(size, rank, argc, argv, dims, &nrows, &ncols);
 
@@ -170,8 +183,6 @@ int main(int argc, char **argv) {
     shared_global_array = malloc(sizeof(double *) * dims[0]);
     *shared_global_array = malloc(sizeof(double) * dims[1]);
 
-    /* pthread_t thread_id; */
-    /* pthread_create(&thread_id, NULL, proper_shutdown_master, NULL); */
 
     base_station(MPI_COMM_WORLD, startComp, size, msg_count, count_buffer);
   }
@@ -342,22 +353,22 @@ void periodic_detection(int *coord, int ndims, int *dims, int my_rank, int size,
      * Send max of 4 messages, 1 with each neighboring node.
      */
 
-    /* for (int i = 0; i < 4; i++) { */
-    /*   MPI_Send(&seismic_readings[my_rank], 1, MPI_SEISMIC_READING,
-     * neighbour_ranks[i], 0, comm2D); */
-    /*   (msg_count)++; */
-    /* } */
-
+    msg_count += NO_OF_NEIGHBOURS;
+    /*************************************************************************/
+    /*                       Initiated thread arguments                      */
+    /*************************************************************************/
     threadargs thread_arguments;
     thread_arguments.reading = &(seismic_readings[my_rank]);
     thread_arguments.comm_2D = comm2D;
+
     for (int i = 0; i < 4; i++) {
       thread_arguments.neighbour_ranks[i] = neighbour_ranks[i];
     }
     thread_arguments.MPI_SEISMIC_READING = MPI_SEISMIC_READING;
 
     pthread_t send_all_thread_id;
-    pthread_create(&send_all_thread_id, NULL, thread_send_all, (void *)&thread_arguments);
+    pthread_create(&send_all_thread_id, NULL, thread_send_all,
+                   (void *)&thread_arguments);
 
     for (int i = 0; i < 4; i++) {
       MPI_Recv(&recv_vals[i], 1, MPI_SEISMIC_READING, neighbour_ranks[i], 0,
@@ -376,7 +387,7 @@ void periodic_detection(int *coord, int ndims, int *dims, int my_rank, int size,
     /*
      * Send max of 4 messages, 1 with each neighboring node.
      */
-    for (int i = 0; i < 4; i++) {
+    for (int i = 0; i < NO_OF_NEIGHBOURS; i++) {
       if (recv_vals[i].magnitude == earthquake_magnitude) {
         printf("rank %i and %i have equal magnitude %.2f.\n", my_rank,
                neighbour_ranks[i], earthquake_magnitude);
@@ -445,4 +456,3 @@ void periodic_detection(int *coord, int ndims, int *dims, int my_rank, int size,
     sleep(2);
   }
 }
-
