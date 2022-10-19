@@ -9,8 +9,6 @@
 
 struct tm *tm;
 
-
-
 void print_readings(seismic_reading new_reading) {
   printf("╔════════════════════════════════════════════════════════════════════"
          "════╗"
@@ -138,51 +136,3 @@ MPI_Datatype create_root_datatype(seismic_reading reading, int size) {
 
   return MPI_SEISMIC_READING;
 }
-
-
-/* int main(int argc, char *argv[]) { */
-/*   int rank, size; */
-/*   MPI_Comm new_comm; */
-/*   MPI_Init(NULL, NULL); */
-
-/*   MPI_Comm_size(MPI_COMM_WORLD, &size); */
-/*   MPI_Comm_rank(MPI_COMM_WORLD, &rank); */
-
-/*   time_t now = time(0); */
-/*   if ((tm = localtime(&now)) == NULL) { */
-/*     printf("Error extracting time stuff\n"); */
-/*     return 1; */
-/*   } */
-
-/*   MPI_Status status; */
-
-/*   if (rank == 0) { */
-/*     seismic_reading new_reading; */
-/*     new_reading.year = tm->tm_year; */
-/*     new_reading.month = tm->tm_mon; */
-/*     new_reading.day = tm->tm_mday; */
-/*     new_reading.hour = tm->tm_hour; */
-/*     new_reading.minute = tm->tm_min; */
-/*     new_reading.second = tm->tm_sec; */
-/*     new_reading.longitude = 512.59; */
-/*     new_reading.magnitude = 5.59; */
-/*     new_reading.no_of_messages[0] = 59; */
-/*     new_reading.no_of_messages[1] = 69; */
-
-/*     MPI_Datatype MPI_SEISMIC_READING = create_root_datatype(new_reading, 3); */
-
-/*     MPI_Send(&new_reading, 1, MPI_SEISMIC_READING, 1, 0, MPI_COMM_WORLD); */
-
-/*   } else if (rank == 1) { */
-/*     seismic_reading reading; */
-/*     MPI_Datatype MPI_SEISMIC_READING = create_root_datatype(reading, 3); */
-/*     MPI_Recv(&reading, 1, MPI_SEISMIC_READING, 0, 0, MPI_COMM_WORLD, &status); */
-/*     print_readings(reading); */
-/*     printf("%i.\n", reading.no_of_messages[0]); */
-/*     printf("%i.\n", reading.no_of_messages[1]); */
-/*   } */
-
-/*   MPI_Barrier(MPI_COMM_WORLD); */
-/*   MPI_Finalize(); */
-/*   exit(0); */
-/* } */

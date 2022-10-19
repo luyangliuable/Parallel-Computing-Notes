@@ -75,3 +75,58 @@ Number of Messages from P rank 5 with neighbor: 8
 Number of Messages from P rank 6 with neighbor: 8
 Number of Messages from P rank 7 with neighbor: 8
 Total Number of Messages: 56
+Simulation Time: 22 seconds
+Number of Alerts Detected: 1
+Number of Messages from base station : 0
+Number of Messages from P rank 1 with neighbor: 8
+Number of Messages from P rank 2 with neighbor: 8
+Number of Messages from P rank 3 with neighbor: 8
+Number of Messages from P rank 4 with neighbor: 8
+Number of Messages from P rank 5 with neighbor: 8
+Number of Messages from P rank 6 with neighbor: 8
+Number of Messages from P rank 7 with neighbor: 8
+Total Number of Messages: 56
+Simulation Time: 23 seconds
+Number of Alerts Detected: 2
+Number of Messages from base station : 1
+Number of Messages from P rank 1 with neighbor: 8
+Number of Messages from P rank 2 with neighbor: 8
+Number of Messages from P rank 3 with neighbor: 8
+Number of Messages from P rank 4 with neighbor: 8
+Number of Messages from P rank 5 with neighbor: 8
+Number of Messages from P rank 6 with neighbor: 8
+Number of Messages from P rank 7 with neighbor: 8
+Total Number of Messages: 56
+Simulation Time: 24 seconds
+Number of Alerts Detected: 3
+Number of Messages from base station : 2
+Number of Messages from P rank 1 with neighbor: 8
+Number of Messages from P rank 2 with neighbor: 8
+Number of Messages from P rank 3 with neighbor: 8
+Number of Messages from P rank 4 with neighbor: 8
+Number of Messages from P rank 5 with neighbor: 8
+Number of Messages from P rank 6 with neighbor: 8
+Number of Messages from P rank 7 with neighbor: 8
+Total Number of Messages: 56
+Simulation Time: 25 seconds
+Number of Alerts Detected: 4
+Number of Messages from base station : 3
+Number of Messages from P rank 1 with neighbor: 8
+Number of Messages from P rank 2 with neighbor: 8
+Number of Messages from P rank 3 with neighbor: 8
+Number of Messages from P rank 4 with neighbor: 8
+Number of Messages from P rank 5 with neighbor: 8
+Number of Messages from P rank 6 with neighbor: 8
+Number of Messages from P rank 7 with neighbor: 8
+Total Number of Messages: 56
+Simulation Time: 26 seconds
+Number of Alerts Detected: 5
+Number of Messages from base station : 4
+Number of Messages from P rank 1 with neighbor: 8
+Number of Messages from P rank 2 with neighbor: 8
+Number of Messages from P rank 3 with neighbor: 8
+Number of Messages from P rank 4 with neighbor: 8
+Number of Messages from P rank 5 with neighbor: 8
+Number of Messages from P rank 6 with neighbor: 8
+Number of Messages from P rank 7 with neighbor: 8
+Total Number of Messages: 56
