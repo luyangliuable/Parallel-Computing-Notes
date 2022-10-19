@@ -1,8 +1,8 @@
-#include <string.h>
 #include <stdio.h>
+#include <string.h>
 #include <unistd.h>
 
-void log_to_file(int time, int no_of_alerts_detected, int* no_of_msg_per_node) {
+void log_to_file(int time, int no_of_alerts_detected, seismic_reading reading, int * no_of_messages, int size) {
   /**
    * @brief      Output the result into result-tasknumber.txt file
    *
@@ -20,9 +20,6 @@ void log_to_file(int time, int no_of_alerts_detected, int* no_of_msg_per_node) {
   char *file_name = "logs.txt";
 
   int total_no_of_messages = 0;
-  for (int i = 0; i < 3; i++) {
-    total_no_of_messages += no_of_msg_per_node[i];
-  }
 
   /***************************************************************************/
   /*                          Append to output file */
@@ -30,8 +27,11 @@ void log_to_file(int time, int no_of_alerts_detected, int* no_of_msg_per_node) {
   FILE *file = fopen(file_name, "a+");
   fprintf(file, "Simulation Time: %i seconds\n", time);
   fprintf(file, "Number of Alerts Detected: %i\n", no_of_alerts_detected);
-  for (int i = 0; i < 3; i++)
-    fprintf(file, "Number of Messages from P rank %i with neighbor: %i\n", i, no_of_msg_per_node[i]);
+  fprintf(file, "Number of Messages from base station : %i\n", no_of_messages[0]);
+  for (int i = 1; i < size; i++) {
+    fprintf(file, "Number of Messages from P rank %i with neighbor: %i\n", i, no_of_messages[i]);
+    total_no_of_messages += no_of_messages[i];
+  }
   fprintf(file, "Total Number of Messages: %i\n", total_no_of_messages);
   fclose(file);
 }

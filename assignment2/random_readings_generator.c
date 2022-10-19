@@ -47,7 +47,7 @@ double generate_rand(double lo, double hi, int decimal_place, unsigned int *seed
 /* } */
 
 double detect_earthquake(double lo, double hi, int rank) {
-  sleep(rank);
+  /* sleep(rank); */
   unsigned int seed = time(NULL) + rank;
   double random_earthquake_float = generate_rand(lo, hi, 100, &seed);
   /* printf("%.2f, %.2f\n", prev, random_earthquake_float); */
@@ -66,13 +66,12 @@ double *get_earthquake_coord(int *coord, int *dimension, int rank) {
                            {-37.82272667427901, 139.50740364825768},
                            {-37.77823707316231, 150.03648974718925}};
 
-  double min_lon = boundary[2][1];
-  double max_lon = boundary[2][1] +
-                   coord[0] * (boundary[1][1] - boundary[2][1]) / dimension[0];
-  double min_lat = boundary[2][0];
-  double max_lat = boundary[0][0] + (coord[1]) *
-                                        (boundary[2][0] - boundary[0][0]) /
-                                        dimension[1];
+  double lon_delta = (boundary[1][1] - boundary[2][1]) / dimension[0];
+  double lat_delta = (boundary[2][0] - boundary[0][0]) / dimension[1];
+  double min_lon = boundary[2][1] - lon_delta;
+  double max_lon = boundary[2][1] + coord[0] * lon_delta + lon_delta;
+  double min_lat = boundary[2][0] - lat_delta;
+  double max_lat = boundary[0][0] + (coord[1]) * lat_delta + lon_delta;
 
   double random_lat = generate_rand(min_lat, max_lat, 100, &seed);
   double random_lon = generate_rand(min_lon, max_lon, 100, &seed);
