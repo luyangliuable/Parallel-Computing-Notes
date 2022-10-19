@@ -31,6 +31,7 @@ typedef struct {
   MPI_Comm master_comm;
   int *no_of_alerts;
   struct timespec startComp;
+  int *count_buffer;
   int size;
 } thread_args_base;
 
@@ -102,13 +103,13 @@ void *thread_recv(void *vargs) {
 
   int tmp = 1;
   MPI_Recv(&tmp_reading, 1, MPI_INT, MPI_ANY_SOURCE, 0, MPI_COMM_WORLD, &status);
-  printf("%.4lf.\n", ( *( params->reading ) ).magnitude);
+  printf("%.4lf.\n", ( *( params->reading_ptr ) ).magnitude);
   // At this point received an alert
   params->no_of_alerts++;
 
-  print_readings(*( params->reading ));
+  print_readings(*( params->reading_ptr ));
 
-  printf("%i.\n", ( *( params->reading ) ).no_of_messages[1]);
+  printf("%i.\n", ( *( params->reading_ptr ) ).no_of_messages[1]);
 
   /*************************************************************************/
   /*                       Calculate simulation time                       */
@@ -118,7 +119,7 @@ void *thread_recv(void *vargs) {
   double time_taken = (curr_time.tv_sec - params->startComp.tv_sec) * 1e9;
   time_taken = (time_taken + (curr_time.tv_nsec - params->startComp.tv_nsec)) * 1e-9;
 
-  log_to_file(time_taken, params->no_of_alerts, *( params->reading ), params->count_buffer, params->size);
+  log_to_file(time_taken, *( params->no_of_alerts ), *( params->reading_ptr ), params->count_buffer, params->size);
 }
 
 void *thread_send_all(void *vargs) {
@@ -263,27 +264,42 @@ void base_station(MPI_Comm master_comm, struct timespec startComp, int size,
     MPI_Gather(&msg_count, 1, MPI_INT, count_buffer, 1, MPI_INT, 0,
                MPI_COMM_WORLD);
 
-    for (int i = 0; i < size; i++) {
-      printf("%i.\n", count_buffer[i]);
-    }
-    MPI_Recv(&reading, 1, MPI_SEISMIC_READING, MPI_ANY_SOURCE, 0, master_comm,
-             &status);
-    print_readings(reading);
+    thread_args_base thread_args;
+    thread_args.MPI_SEISMIC_READING = MPI_SEISMIC_READING;
+    thread_args.reading_ptr = malloc(sizeof(seismic_reading));
+    *( thread_args.reading_ptr ) = reading;
+    thread_args.count_buffer = malloc(sizeof(int) * size);
+    thread_args.count_buffer = count_buffer;
+    thread_args.master_comm = master_comm;
+    thread_args.no_of_alerts = no_of_alerts;
+    thread_args.size = size;
+    thread_args.startComp = startComp;
 
-    (msg_count)++;
-    printf("%i.\n", reading.no_of_messages[1]);
+    pthread_t thread_id;
+    pthread_create(&thread_id, NULL, thread_recv, (void *)&thread_args);
 
-    no_of_alerts++;
-    // TODO compare with seismic balloon sensor
-    // If match, conclusive alert
-    // Else, inconclusive alert
+    /* MPI_Recv(&reading, 1, MPI_SEISMIC_READING, MPI_ANY_SOURCE, 0,
+       master_comm, */
+    /*          &status); */
+    /* print_readings(reading); */
 
-    struct timespec curr_time;
-    clock_gettime(CLOCK_MONOTONIC, &curr_time);
-    double time_taken = (curr_time.tv_sec - startComp.tv_sec) * 1e9;
-    time_taken = (time_taken + (curr_time.tv_nsec - startComp.tv_nsec)) * 1e-9;
+    /* (msg_count)++; */
+    /* printf("%i.\n", reading.no_of_messages[1]); */
 
-    log_to_file(time_taken, no_of_alerts, reading, count_buffer, size);
+    /* no_of_alerts++; */
+    /* // TODO compare with seismic balloon sensor */
+    /* // If match, conclusive alert */
+    /* // Else, inconclusive alert */
+
+    /* struct timespec curr_time; */
+    /* clock_gettime(CLOCK_MONOTONIC, &curr_time); */
+    /* double time_taken = (curr_time.tv_sec - startComp.tv_sec) * 1e9;
+     */
+    /* time_taken = (time_taken + (curr_time.tv_nsec -
+       startComp.tv_nsec)) * 1e-9; */
+
+    /* log_to_file(time_taken, no_of_alerts, reading,
+       count_buffer, size); */
 
     sleep(1);
   }
