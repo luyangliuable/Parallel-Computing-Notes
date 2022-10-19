@@ -85,6 +85,7 @@ void log_to_file(double time, int no_of_alerts_detected, seismic_reading reading
       if (c == 'q' || c == 'Q') {
         for (int i = 1; i < 8; i++)
           MPI_Send(&q, 1, MPI_INT, i, 1, MPI_COMM_WORLD);
+
         printf("Quiting.\n");
 
         MPI_Finalize();
@@ -126,7 +127,11 @@ void log_to_file(double time, int no_of_alerts_detected, seismic_reading reading
     /*     params->size); */
 
     /* printf("Base threading SUCCESSFUL!!!"); */
-    /* log_to_file(time_taken, *(params->no_of_alerts), *(params->reading_ptr), params->count_buffer, params->size); */
+    printf("Simulation time %.2f.\n", time_taken);
+    printf("Simulation time %.2f.\n", time_taken);
+    log_to_file(time_taken, *(params->no_of_alerts), *(params->reading_ptr), params->count_buffer, params->size);
+
+    free(params->reading_ptr);
   }
 
   void *thread_send_all(void *vargs) {
@@ -176,7 +181,9 @@ void log_to_file(double time, int no_of_alerts_detected, seismic_reading reading
       pthread_t thread_id;
       double tmp_x;
       double tmp_y;
+
       pthread_create(&thread_id, NULL, proper_shutdown_master, NULL);
+
       printf("Please enter the threshold magnitude for earthquake (For default "
              "enter 0):\n");
       scanf("%lf", &tmp_x);
@@ -195,7 +202,8 @@ void log_to_file(double time, int no_of_alerts_detected, seismic_reading reading
         DISTANCE_THRESHOLD = tmp_y;
       }
 
-      printf("New distance threshold  is %.2lf.\n", DISTANCE_THRESHOLD);
+      /* printf("New distance threshold  is %.2lf.\n", DISTANCE_THRESHOLD); */
+      /* pthread_join(thread_id, NULL); */
     }
 
     MPI_Barrier(MPI_COMM_WORLD);
@@ -218,7 +226,11 @@ void log_to_file(double time, int no_of_alerts_detected, seismic_reading reading
       groups_to_incl[i - 1] = i;
     }
 
+
     MPI_Group_incl(old_group, size - 1, groups_to_incl, &group);
+
+    free(groups_to_incl);
+
     MPI_Comm_create(MPI_COMM_WORLD, group, &new_comm);
 
     int cart_size;
@@ -268,6 +280,7 @@ void log_to_file(double time, int no_of_alerts_detected, seismic_reading reading
                 MPI_COMM_WORLD);
 
     while (1) {
+      pthread_t thread_id;
       MPI_Gather(&msg_count, 1, MPI_INT, count_buffer, 1, MPI_INT, 0,
                  MPI_COMM_WORLD);
 
@@ -279,6 +292,8 @@ void log_to_file(double time, int no_of_alerts_detected, seismic_reading reading
 
       thread_args.reading_ptr = malloc(sizeof(seismic_reading));
       *(thread_args.reading_ptr) = reading;
+
+
       thread_args.count_buffer = malloc(sizeof(int) * size);
       thread_args.count_buffer = count_buffer;
       thread_args.master_comm = master_comm;
@@ -286,7 +301,6 @@ void log_to_file(double time, int no_of_alerts_detected, seismic_reading reading
       thread_args.size = size;
       thread_args.startComp = startComp;
 
-      pthread_t thread_id;
       pthread_create(&thread_id, NULL, thread_recv, (void *)&thread_args);
 
       /* MPI_Recv(&reading, 1, MPI_SEISMIC_READING, MPI_ANY_SOURCE, 0,
@@ -312,7 +326,8 @@ void log_to_file(double time, int no_of_alerts_detected, seismic_reading reading
       /* log_to_file(time_taken, no_of_alerts, reading,
          count_buffer, size); */
 
-      sleep(1);
+      pthread_join(thread_id, NULL);
+      sleep(2);
     }
   }
 
@@ -593,17 +608,17 @@ void log_to_file(double time, int no_of_alerts_detected, seismic_reading reading
     /***************************************************************************/
     FILE *file = fopen(file_name, "a+");
 
-    printf("Base threading SUCCESSFUL!!!");
-    /* fprintf(file, "Simulation Time: %i seconds\n", time); */
-    /* fprintf(file, "Number of Alerts Detected: %i\n", no_of_alerts_detected);
-     */
-    /* fprintf(file, "Number of Messages from base station : %i\n",
-     * no_of_messages[0]); */
-    /* for (int i = 1; i < size; i++) { */
-    /*   fprintf(file, "Number of Messages from P rank %i with neighbor: %i\n",
-     * i, no_of_messages[i]); */
-    /*   total_no_of_messages += no_of_messages[i]; */
-    /* } */
-    /* fprintf(file, "Total Number of Messages: %i\n", total_no_of_messages); */
-    /* fclose(file); */
+    fprintf(file, "Simulation Time: %.2f seconds\n", time);
+    fprintf(file, "Number of Alerts Detected: %i\n", no_of_alerts_detected);
+    fprintf(file, "Number of Messages from base station : %i\n",
+    no_of_messages[0]);
+    for (int i = 1; i < size; i++) {
+      fprintf(file, "Number of Messages from P rank %i with neighbor: %i\n",
+    i, no_of_messages[i]);
+      total_no_of_messages += no_of_messages[i];
+    }
+    fprintf(file, "Total Number of Messages: %i\n", total_no_of_messages);
+    fclose(file);
+
+    printf("Base threading SUCCESSFUL!!!\n");
   }
