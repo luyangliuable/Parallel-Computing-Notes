@@ -93,6 +93,34 @@ void *proper_shutdown_master(void *vargp) {
   }
 }
 
+void *thread_recv(void *vargs) {
+  thread_args_base *params;
+  params = (thread_args_base *)vargs;
+  MPI_Status status;
+
+  seismic_reading tmp_reading;
+
+  int tmp = 1;
+  MPI_Recv(&tmp_reading, 1, MPI_INT, MPI_ANY_SOURCE, 0, MPI_COMM_WORLD, &status);
+  printf("%.4lf.\n", ( *( params->reading ) ).magnitude);
+  // At this point received an alert
+  params->no_of_alerts++;
+
+  print_readings(*( params->reading ));
+
+  printf("%i.\n", ( *( params->reading ) ).no_of_messages[1]);
+
+  /*************************************************************************/
+  /*                       Calculate simulation time                       */
+  /*************************************************************************/
+  struct timespec curr_time;
+  clock_gettime(CLOCK_MONOTONIC, &curr_time);
+  double time_taken = (curr_time.tv_sec - params->startComp.tv_sec) * 1e9;
+  time_taken = (time_taken + (curr_time.tv_nsec - params->startComp.tv_nsec)) * 1e-9;
+
+  log_to_file(time_taken, params->no_of_alerts, *( params->reading ), params->count_buffer, params->size);
+}
+
 void *thread_send_all(void *vargs) {
   thread_args_ground *params;
   params = (thread_args_ground *)vargs;
