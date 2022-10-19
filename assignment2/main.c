@@ -55,7 +55,7 @@ void *proper_shutdown_slave(void *vargp) {
   MPI_Status status;
   MPI_Irecv(&tmp, 1, MPI_INT, MPI_ANY_SOURCE, 1, MPI_COMM_WORLD, &request);
   MPI_Wait(&request, &status);
-  printf("Quiting slave processes.\n");
+  printf("Quitting slave process.\n");
   MPI_Finalize();
   exit(0);
 }
@@ -63,7 +63,7 @@ void *proper_shutdown_slave(void *vargp) {
 void *proper_shutdown_master(void *vargp) {
   printf("Press q + ENTER to quit program.\n");
 
-  int size;
+  /*int size;*/
   int q = 1;
 
   while (1) {
@@ -72,7 +72,7 @@ void *proper_shutdown_master(void *vargp) {
     if (c == 'q' || c == 'Q') {
       for (int i = 1; i < 8; i++)
         MPI_Send(&q, 1, MPI_INT, i, 1, MPI_COMM_WORLD);
-      printf("Quiting.\n");
+      printf("Quitting.\n");
 
       MPI_Finalize();
       exit(0);
@@ -107,7 +107,7 @@ int main(int argc, char **argv) {
    * @return     return 0
    */
 
-  struct timespec start, end, startComp, endComp;
+  struct timespec startComp;
 
   int rank, size;
   MPI_Comm new_comm;
@@ -180,9 +180,8 @@ int main(int argc, char **argv) {
     count_buffer[i] = 0;
 
   if (rank != 0) {
-    // TODO slave shutdown gives segmentation fault 11
-    /* pthread_t thread_id_slave; */
-    /* pthread_create(&thread_id_slave, NULL, proper_shutdown_slave, NULL); */
+    pthread_t thread_id_slave;
+    pthread_create(&thread_id_slave, NULL, proper_shutdown_slave, NULL);
 
     MPI_Comm_size(new_comm, &cart_size);
 
@@ -323,9 +322,11 @@ void periodic_detection(int *coord, int ndims, int *dims, int my_rank, int size,
 
   seismic_reading recv_vals[4];
   seismic_reading seismic_readings[size];
+  /*
   MPI_Request send_request[4];
   MPI_Request receive_request[4];
   MPI_Status send_status[4];
+  */
   MPI_Status receive_status[4];
 
   int msg_count = 0;
