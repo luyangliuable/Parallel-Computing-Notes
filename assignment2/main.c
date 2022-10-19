@@ -99,12 +99,11 @@ void *thread_recv(void *vargs) {
   params = (thread_args_base *)vargs;
   MPI_Status status;
 
-  seismic_reading tmp_reading;
-
   int tmp = 1;
-  MPI_Recv(&tmp_reading, 1, MPI_INT, MPI_ANY_SOURCE, 0, MPI_COMM_WORLD, &status);
+  MPI_Recv(params->reading_ptr, 1, params->MPI_SEISMIC_READING, MPI_ANY_SOURCE, 0, MPI_COMM_WORLD, &status);
   printf("%.4lf.\n", ( *( params->reading_ptr ) ).magnitude);
-  // At this point received an alert
+  /* At this point received an alert */
+
   params->no_of_alerts++;
 
   print_readings(*( params->reading_ptr ));
@@ -116,10 +115,12 @@ void *thread_recv(void *vargs) {
   /*************************************************************************/
   struct timespec curr_time;
   clock_gettime(CLOCK_MONOTONIC, &curr_time);
+
   double time_taken = (curr_time.tv_sec - params->startComp.tv_sec) * 1e9;
   time_taken = (time_taken + (curr_time.tv_nsec - params->startComp.tv_nsec)) * 1e-9;
 
-  log_to_file(time_taken, *( params->no_of_alerts ), *( params->reading_ptr ), params->count_buffer, params->size);
+  printf("BAse threading SUCESSFUL!!!");
+  /* log_to_file(time_taken, *( params->no_of_alerts ), *( params->reading_ptr ), params->count_buffer, params->size); */
 }
 
 void *thread_send_all(void *vargs) {
@@ -266,12 +267,16 @@ void base_station(MPI_Comm master_comm, struct timespec startComp, int size,
 
     thread_args_base thread_args;
     thread_args.MPI_SEISMIC_READING = MPI_SEISMIC_READING;
+
+    // This fixed segmentation fault!!!
+    /* ♪┏(・o･)┛♪┗ (･o･) ┓♪ */
+
     thread_args.reading_ptr = malloc(sizeof(seismic_reading));
-    *( thread_args.reading_ptr ) = reading;
+    *(thread_args.reading_ptr) = reading;
     thread_args.count_buffer = malloc(sizeof(int) * size);
     thread_args.count_buffer = count_buffer;
     thread_args.master_comm = master_comm;
-    thread_args.no_of_alerts = no_of_alerts;
+    thread_args.no_of_alerts = &no_of_alerts;
     thread_args.size = size;
     thread_args.startComp = startComp;
 
@@ -427,7 +432,8 @@ void periodic_detection(int *coord, int ndims, int *dims, int my_rank, int size,
     /*                       Initiated thread arguments */
     /*************************************************************************/
     thread_args_ground thread_arguments;
-    thread_arguments.reading = &(seismic_readings[my_rank]);
+    thread_arguments.reading = malloc(sizeof(seismic_reading));
+    *( thread_arguments.reading ) = (seismic_readings[my_rank]);
     thread_arguments.comm_2D = comm2D;
 
     for (int i = 0; i < 4; i++) {
