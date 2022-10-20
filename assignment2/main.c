@@ -44,7 +44,11 @@ typedef struct {
   int neighbour_ranks[NO_OF_NEIGHBOURS];
 } thread_args_ground;
 
-double **shared_global_array;
+typedef struct {
+  int *dims;
+  double **shared_global_array;
+  int size;
+} balloon_args_base;
 
 /*****************************************************************************/
 /*                            Prototype Functions                            */
@@ -55,7 +59,7 @@ int earthquake_detection_system(int my_rank, int size, MPI_Comm master_comm,
 void periodic_detection(int *coord, int ndims, int *dims, int my_rank, int size,
                         int *neighbour_ranks, MPI_Comm comm2D);
 void base_station(MPI_Comm master_comm, struct timespec startComp, int size,
-                  int msg_count, int *count_buffer);
+                  int msg_count, int *count_buffer, int *dims);
 void get_user_arguments(int size, int rank, int argc, char **argv, int *dims,
                         int *nrows, int *ncols);
 double compute_distance(int *coord1, int *coord2);
@@ -64,21 +68,47 @@ int slave_io(MPI_Comm master_comm, MPI_Comm comm);
 void *init_threshold_values(int rank);
 void log_to_file(double time, int no_of_alerts_detected,
                  seismic_reading reading, int *no_of_messages, int size);
-
-void *balloon_sensor(void *vargp) { exit(0); }
+/* BALLOON SENSOR CODE
+void *balloon_sensor(void *vargs) {
+  balloon_args_base *args;
+  args = (balloon_args_base *)vargs;
+  int *dims = args->dims;
+  int *coords;
+  coords[0] = dims[0]/2;
+  coords[1] = dims[1]/2;
+  int min = 0.0, max = 9.0;
+  int count = 0;
+  int max_count = (args->size) + 1;
+  (args->shared_global_array)[0][0] = count;
+  
+  while(1) {
+    (args->shared_global_array)[0][0] = count;
+    (args->shared_global_array)[count][0] = detect_earthquake(min, max, 20);
+    double *quake_coords = get_earthquake_coord(coords, dims, 20);
+    (args->shared_global_array)[count][1] = quake_coords[0];
+    (args->shared_global_array)[count][2] = quake_coords[1];
+  
+    if (count == max_count + 1) {
+      printf("\nCount: %d\n", count);
+      count = 0;
+    }
+    else count++;
+    sleep(1);
+  }
+}
+*/
 
 void *proper_shutdown_slave(void *vargp) {
   // TODO NOT WORKING!
   int tmp = 1;
   MPI_Request request;
-  MPI_Status status;
   MPI_Irecv(&tmp, 1, MPI_INT, MPI_ANY_SOURCE, 1, MPI_COMM_WORLD, &request);
-  MPI_Wait(&request, &status);
-  printf("Quiting slave processes.\n");
+  MPI_Wait(&request, MPI_STATUS_IGNORE);
+  printf("Quitting slave processes.\n");
   MPI_Finalize();
   exit(0);
 }
-
+/*
 void *proper_shutdown_master(void *vargp) {
   printf("Press q + ENTER to quit program.\n");
 
@@ -92,7 +122,7 @@ void *proper_shutdown_master(void *vargp) {
       for (int i = 1; i < 8; i++)
         MPI_Send(&q, 1, MPI_INT, i, 1, MPI_COMM_WORLD);
 
-      printf("Quiting.\n");
+      printf("Quitting.\n");
 
       MPI_Finalize();
       exit(0);
@@ -100,13 +130,14 @@ void *proper_shutdown_master(void *vargp) {
     sleep(1);
   }
 }
+*/
 
 void *thread_recv(void *vargs) {
   thread_args_base *params;
   params = (thread_args_base *)vargs;
   MPI_Status status;
 
-  int tmp = 1;
+  //int tmp = 1;
   ( params->count_buffer )[0]++;
   (params->count_buffer)[0]++;
   (params->count_buffer)[0]++;
@@ -160,7 +191,7 @@ int main(int argc, char **argv) {
    * @return     return 0
    */
 
-  struct timespec start, end, startComp, endComp;
+  struct timespec startComp;
 
   int rank, size;
   MPI_Comm new_comm;
@@ -178,11 +209,12 @@ int main(int argc, char **argv) {
   int nrows, ncols;
 
   if (rank == 0) {
-    pthread_t thread_id;
+    //pthread_t thread_id;
     double tmp_x;
     double tmp_y;
 
-    pthread_create(&thread_id, NULL, proper_shutdown_master, NULL);
+    /*pthread_create(&thread_id, NULL, proper_shutdown_master, NULL);*/
+    printf("Press q + ENTER to quit program.\n");
 
     printf("Please enter the threshold magnitude for earthquake (For default "
            "enter 0):\n");
@@ -240,8 +272,8 @@ int main(int argc, char **argv) {
 
   if (rank != 0) {
     // TODO slave shutdown gives segmentation fault 11
-    /* pthread_t thread_id_slave; */
-    /* pthread_create(&thread_id_slave, NULL, proper_shutdown_slave, NULL); */
+    pthread_t thread_id_slave;
+    pthread_create(&thread_id_slave, NULL, proper_shutdown_slave, NULL);
 
     MPI_Comm_size(new_comm, &cart_size);
 
@@ -253,12 +285,8 @@ int main(int argc, char **argv) {
     /*                       Root Rank and Base Station */
     /*************************************************************************/
 
-    shared_global_array = malloc(sizeof(double *) * dims[0]);
-    *shared_global_array = malloc(sizeof(double) * dims[1]);
-
-    base_station(MPI_COMM_WORLD, startComp, size, msg_count, count_buffer);
+    base_station(MPI_COMM_WORLD, startComp, size, msg_count, count_buffer, dims);
   }
-
   MPI_Finalize();
 
   free(dims);
@@ -266,17 +294,28 @@ int main(int argc, char **argv) {
   return 0;
 }
 
-void base_station(MPI_Comm master_comm, struct timespec startComp, int size, int msg_count, int *count_buffer) {
+void base_station(MPI_Comm master_comm, struct timespec startComp, int size, int msg_count, int *count_buffer, int *dims) {
   int no_of_alerts = 0;
   printf("ground node start.\n");
   seismic_reading reading;
 
   MPI_Datatype MPI_SEISMIC_READING = create_root_datatype(reading, size);
-  MPI_Status status;
+  //MPI_Status status;
 
   msg_count = 1;
   MPI_Scatter(count_buffer, 1, MPI_INT, &msg_count, 1, MPI_INT, 0,
               MPI_COMM_WORLD);
+  /* BALLOON SENSOR CODE            
+  int glob_array_size = 10;
+  double shared_global_array[glob_array_size+1][3];
+  pthread_t balloon;
+  balloon_args_base balloon_args;
+  balloon_args.dims = dims;
+  balloon_args.shared_global_array = shared_global_array;
+  balloon_args.size = glob_array_size;
+  pthread_create(&balloon, NULL, balloon_sensor, (void *)&balloon_args);
+*/
+  
 
   while (1) {
     pthread_t thread_id;
@@ -304,6 +343,19 @@ void base_station(MPI_Comm master_comm, struct timespec startComp, int size, int
     pthread_create(&thread_id, NULL, thread_recv, (void *)&thread_args);
 
     pthread_join(thread_id, NULL);
+
+    // int size;
+    int q = 1;
+    char c = getchar();
+
+    if (c == 'q' || c == 'Q') {
+      printf("Quitting.\n");
+      for (int i = 1; i < 8; i++)
+        MPI_Send(&q, 1, MPI_INT, i, 1, MPI_COMM_WORLD);
+      break;
+  }
+    
+    
     sleep(2);
   }
 }
@@ -382,9 +434,9 @@ void periodic_detection(int *coord, int ndims, int *dims, int my_rank, int size,
 
   seismic_reading recv_vals[4];
   seismic_reading seismic_readings[size];
-  MPI_Request send_request[4];
-  MPI_Request receive_request[4];
-  MPI_Status send_status[4];
+  //MPI_Request send_request[4];
+  //MPI_Request receive_request[4];
+  //MPI_Status send_status[4];
   MPI_Status receive_status[4];
 
   int msg_count = 0;
@@ -532,10 +584,10 @@ void periodic_detection(int *coord, int ndims, int *dims, int my_rank, int size,
 
 void *init_threshold_values(int rank) {
   if (rank == 0) {
-    pthread_t thread_id;
+    //pthread_t thread_id;
     double tmp_x;
     double tmp_y;
-    pthread_create(&thread_id, NULL, proper_shutdown_master, NULL);
+    /*pthread_create(&thread_id, NULL, proper_shutdown_master, NULL);*/
     printf("Please enter the threshold magnitude for earthquake (For default "
            "enter 0):\n");
     scanf("%lf", &tmp_x);
