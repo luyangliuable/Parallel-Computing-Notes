@@ -55,7 +55,7 @@ int init_reading(seismic_reading *reading, float longitude, float latitude,
   reading->longitude = longitude;
   reading->latitude = latitude;
   reading->depth = depth;
-  /* reading->source = (char *)get_cur_processs_ip_address(); */
+  reading->source = (char *)get_cur_processs_ip_address();
 
   return 0;
 }
