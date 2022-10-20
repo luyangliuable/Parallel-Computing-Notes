@@ -61,7 +61,7 @@ void *balloon_sensor(void *vargp) {
     double *coords = get_earthquake_coord(coord, dims, 10);
     glob_array[counter][1] = coords[0];
     glob_array[counter][2] = coords[1];
-  
+
     if (count == max_count + 1)
       count = 0;
     else count++;
@@ -149,9 +149,9 @@ int main(int argc, char **argv) {
     double tmp_x;
     double tmp_y;
     pthread_create(&thread_id, NULL, proper_shutdown_master, NULL);
-    printf("Please enter the threshold magnitude for earthquake (For default "
-           "enter 0):\n");
+    printf("Please enter the threshold magnitude for earthquake (For default " "enter 0):\n");
     scanf("%lf", &tmp_x);
+
     if (tmp_x) {
       EARTHQUAKE_THRESHOLD = tmp_x;
     }
@@ -201,8 +201,8 @@ int main(int argc, char **argv) {
 
   if (rank != 0) {
     // TODO slave shutdown gives segmentation fault 11
-    pthread_t thread_id_slave;
-    pthread_create(&thread_id_slave, NULL, proper_shutdown_slave, NULL);
+    /* pthread_t thread_id_slave; */
+    /* pthread_create(&thread_id_slave, NULL, proper_shutdown_slave, NULL); */
 
     MPI_Comm_size(new_comm, &cart_size);
 
@@ -258,7 +258,7 @@ void base_station(MPI_Comm master_comm, struct timespec startComp, int size,
     double *balloon_reading = glob_array[balloon_count];
     double dist = distance(balloon_reading[1], balloon_reading[2],
                      reading.latitude, reading.longitude, 'K');
-    
+
     if (balloon_reading[0] - reading.magnitude < EARTHQUAKE_THRESHOLD &&
       dist < DISTANCE_THRESHOLD) {
         // Conclusive alert
@@ -267,7 +267,7 @@ void base_station(MPI_Comm master_comm, struct timespec startComp, int size,
           reading.magnitude, reading.latitude, reading.longitude);
         print_readings(reading);
         no_of_alerts++;
-        
+
     } else {
     // Inconclusive alert
     }

@@ -21,6 +21,8 @@
 double EARTHQUAKE_THRESHOLD = 5.5;
 double DISTANCE_THRESHOLD = 7500;
 
+double **glob_array;
+
 /*
  * Argument to put inside struct for thread to see.
  */
@@ -65,7 +67,41 @@ void *init_threshold_values(int rank);
 void log_to_file(double time, int no_of_alerts_detected,
                  seismic_reading reading, int *no_of_messages, int size);
 
-void *balloon_sensor(void *vargp) { exit(0); }
+typedef struct {
+  int dims[2];
+} balloon_sensor_args;
+
+void *balloon_sensor(void *vargp) {
+  balloon_sensor_args *params = (balloon_sensor_args *)vargp;
+
+  int min = 0.0, max = 9.0;
+  int dims[2];
+  dims[0] = params->dims[0];
+  dims[1] = params->dims[1];
+  extern double **glob_array;
+  double count = 1;
+  double max_count = 20;
+
+  double ***glob_array_ptr = &glob_array;
+
+  *glob_array_ptr = (double **)malloc(sizeof(double *) * dims[0]);
+  for (int i = 0; i < dims[1]; i++) {
+    *(*glob_array_ptr + i) = (double *)malloc(sizeof(double) * dims[1]);
+  }
+
+  while (1) {
+    for (int i = 0; i < dims[0]; i++) {
+      for (int j = 0; j < dims[1]; j++) {
+        glob_array[i][j] = detect_earthquake(min, max, 1);
+        printf("%.2f.\n", glob_array[i][j]);
+        sleep(1);
+      }
+    }
+    sleep(1);
+  }
+
+  return 0;
+}
 
 void *proper_shutdown_slave(void *vargp) {
   // TODO NOT WORKING!
@@ -103,24 +139,24 @@ void *proper_shutdown_master(void *vargp) {
 
 void *thread_recv(void *vargs) {
   thread_args_base *params;
-params = (thread_args_base *)vargs;
-MPI_Status status;
+  params = (thread_args_base *)vargs;
+  MPI_Status status;
 
-int tmp = 1;
+  int tmp = 1;
 
   (params->count_buffer)[0]++;
 
   MPI_Recv(params->reading_ptr, 1, params->MPI_SEISMIC_READING, MPI_ANY_SOURCE,
            0, MPI_COMM_WORLD, &status);
 
-  ( *(params->reading_ptr) ).source = (char *)get_cur_processs_ip_address();
+  (*(params->reading_ptr)).source = (char *)get_cur_processs_ip_address();
 
-  printf("At base, source is %s/%i.\n", (*(params->reading_ptr)).source, (*(params->reading_ptr)).source_rank);
+  printf("At base, source is %s/%i.\n", (*(params->reading_ptr)).source,
+         (*(params->reading_ptr)).source_rank);
 
   (*(params->no_of_alerts))++;
 
   print_readings(*(params->reading_ptr));
-
 
   /*************************************************************************/
   /*                       Calculate simulation time                       */
@@ -132,7 +168,8 @@ int tmp = 1;
   time_taken =
       (time_taken + (curr_time.tv_nsec - params->startComp.tv_nsec)) * 1e-9;
 
-  log_to_file(time_taken, *(params->no_of_alerts), *(params->reading_ptr), params->count_buffer, params->size);
+  log_to_file(time_taken, *(params->no_of_alerts), *(params->reading_ptr),
+              params->count_buffer, params->size);
 
   free(params->reading_ptr);
 
@@ -188,7 +225,14 @@ int main(int argc, char **argv) {
     double tmp_x;
     double tmp_y;
 
+    // Create one thread for proper shutdown
     pthread_create(&thread_id, NULL, proper_shutdown_master, NULL);
+
+    // Create one thread for global array
+    balloon_sensor_args thread_args;
+    thread_args.dims[0] = nrows;
+    thread_args.dims[1] = ncols;
+    pthread_create(&thread_id, NULL, balloon_sensor, (void *) &thread_args);
 
     printf("Please enter the threshold magnitude for earthquake (For default "
            "enter 0):\n");
@@ -293,7 +337,6 @@ void base_station(MPI_Comm master_comm, struct timespec startComp, int size,
     thread_args_base thread_args;
     thread_args.MPI_SEISMIC_READING = MPI_SEISMIC_READING;
 
-
     // This fixed segmentation fault!!!
     /* ♪┏(・o･)┛♪┗ (･o･) ┓♪ */
 
@@ -354,7 +397,8 @@ int earthquake_detection_system(int my_rank, int size, MPI_Comm master_comm,
   MPI_Cart_shift(comm2D, SHIFT_ROW, DISP, &nbr_i_lo, &nbr_i_hi);
   MPI_Cart_shift(comm2D, SHIFT_COL, DISP, &nbr_j_lo, &nbr_j_hi);
 
-  int neighbour_ranks[NO_OF_NEIGHBOURS] = {nbr_i_lo, nbr_i_hi, nbr_j_lo, nbr_j_hi};
+  int neighbour_ranks[NO_OF_NEIGHBOURS] = {nbr_i_lo, nbr_i_hi, nbr_j_lo,
+                                           nbr_j_hi};
 
   periodic_detection(coord, ndims, dims, my_rank, size, neighbour_ranks,
                      comm2D);
@@ -415,7 +459,8 @@ void periodic_detection(int *coord, int ndims, int *dims, int my_rank, int size,
      * Put the measurements into reading struct.
      * Also store the IP address where the reading is done.
      */
-    init_reading(&seismic_readings[my_rank], earthquake_loc[0], earthquake_loc[1], depth, my_rank+1);
+    init_reading(&seismic_readings[my_rank], earthquake_loc[0],
+                 earthquake_loc[1], depth, my_rank + 1);
 
     record_current_time(&seismic_readings[my_rank]);
 
