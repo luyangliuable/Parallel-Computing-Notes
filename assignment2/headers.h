@@ -50,11 +50,13 @@ int record_current_time(seismic_reading *reading) {
   return 0;
 }
 
-int init_reading(seismic_reading *reading, float longitude, float latitude,
-                 float depth) {
+int init_reading(seismic_reading *reading, float longitude, float latitude, float depth, int rank) {
   reading->longitude = longitude;
   reading->latitude = latitude;
   reading->depth = depth;
+  /* reading->source = (char *) malloc(strlen((char *)get_cur_processs_ip_address())); */
+  // TODO MPI_Struct pass in a string kinda wierd
+  reading->source_rank = rank;
   reading->source = (char *)get_cur_processs_ip_address();
 
   return 0;
@@ -97,7 +99,7 @@ MPI_Datatype create_root_datatype(seismic_reading reading, int size) {
   array_of_blocklengths[7] = 1;
   array_of_blocklengths[8] = 1;
   array_of_blocklengths[9] = 1;
-  array_of_blocklengths[10] = size;
+  array_of_blocklengths[10] = 1;
   array_of_blocklengths[11] = 1;
 
   MPI_Aint array_of_displaysments[no_of_blocks];
@@ -122,7 +124,7 @@ MPI_Datatype create_root_datatype(seismic_reading reading, int size) {
   array_of_displaysments[8] = a2 - a1;
   MPI_Get_address(&reading.depth, &a2);
   array_of_displaysments[9] = a2 - a1;
-  MPI_Get_address(&reading.no_of_messages, &a2);
+  MPI_Get_address(&reading.source_rank, &a2);
   array_of_displaysments[10] = a2 - a1;
   MPI_Get_address(&reading.source, &a2);
   array_of_displaysments[11] = a2 - a1;

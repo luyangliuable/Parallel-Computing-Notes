@@ -9,7 +9,6 @@ typedef struct {
   double longitude;        // The time process entered system
   double magnitude;        // The total CPU time required by the process int
   double depth;            // Remaining service time until completion
-  int no_of_messages[100]; // The number of messages in the node, max 100
-                           // processes
+  int source_rank;            // The source ground node IP address.
   char *source;            // The source ground node IP address.
 } seismic_reading;
