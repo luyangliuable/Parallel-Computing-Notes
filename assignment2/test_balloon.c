@@ -26,10 +26,10 @@ void *balloon_sensor(void *vargp) {
 
   double ***glob_array_ptr = &glob_array;
 
-  *glob_array_ptr = (double **)malloc(sizeof(double *) * dims[0]);
-  for (int i = 0; i < dims[1]; i++) {
-    *(*glob_array_ptr + i) = (double *)malloc(sizeof(double) * dims[1]);
-  }
+  /* *glob_array_ptr = (double **)malloc(sizeof(double *) * dims[0]); */
+  /* for (int i = 0; i < dims[1]; i++) { */
+  /*   *(*glob_array_ptr + i) = (double *)malloc(sizeof(double) * dims[1]); */
+  /* } */
 
   while (1) {
     for (int i = 0; i < dims[0]; i++) {
