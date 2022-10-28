@@ -22,8 +22,11 @@ int main(int argc, char *argv[]) {
   /*   *A = ( double* ) malloc(sizeof(double) * SIZE); */
   /* }; */
 
-  double A[SIZE][SIZE] = {{2, 2}, {2, 2}};
-  double B[SIZE][SIZE] = {{3, 3}, {3, 3}};
+  /* double A[SIZE][SIZE] = {{2, 2}, {2, 2}}; */
+  /* double B[SIZE][SIZE] = {{3, 3}, {3, 3}}; */
+
+  double A[SIZE][SIZE] = {{1, 2}, {3, 4}};
+  double B[SIZE][SIZE] = {{5, 6}, {7, 8}};
 
   double ans[SIZE][SIZE];
 
