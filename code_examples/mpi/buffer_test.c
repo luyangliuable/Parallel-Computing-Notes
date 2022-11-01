@@ -18,15 +18,19 @@ int main(int argc, char *argv[]) {
     printf("Buffered send...\n");
     MPI_Request request;
     MPI_Status status;
-    MPI_Ssend(val, 100, MPI_INT, 1, 0, MPI_COMM_WORLD);
-    printf("Buffered send done.\n");
+    MPI_Isend(val, 100, MPI_INT, 1, 0, MPI_COMM_WORLD, &request);
+    free(val);
+    /* val = 10000; */
+    sleep(10);
+    MPI_Wait(&request, &status);
   } else if (rank == 1) {
     int tmp[100];
     /* sleep(5); */
     MPI_Request request;
     MPI_Status status;
-    MPI_Recv(&tmp, 100, MPI_INT, 0, 0, MPI_COMM_WORLD, &status);
-    sleep(15);
+    MPI_Irecv(&tmp, 100, MPI_INT, 0, 0, MPI_COMM_WORLD, &request);
+    sleep(5);
+    MPI_Wait(&request, &status);
     printf("Rank %i: Received %i.\n", rank, tmp[99]);
   }
 

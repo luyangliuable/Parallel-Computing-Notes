@@ -19,12 +19,14 @@ void *Thread1Func(void *pArg) {
   printf("Thread Id: %d. Global value before updated by Thread2Func: %d\n",
          myNum, g_Val);
 
-  pthread_cond_wait(&g_Cond, &g_Mutex);
-  printf("Thread Id: %d. Global value after updated by Thread2Func: %d\n",
-         myNum, g_Val);
+  while(g_Val < 3) {
+    pthread_cond_wait(&g_Cond, &g_Mutex);
+    printf("Thread Id: %d. Global value after updated by Thread2Func: %d\n",
+          myNum, g_Val);
 
-  g_Val += 1;
-  pthread_mutex_unlock(&g_Mutex);
+    g_Val += 1;
+    pthread_mutex_unlock(&g_Mutex);
+  }
 
   return NULL;
 }

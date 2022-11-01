@@ -57,12 +57,12 @@ void *ControlModuleFunc(void *pArg) {
     }
     pthread_mutex_lock(&g_RobotMutexArr[0]);
     g_RobotOnOffArr[0] = tRes_0;
-    /* pthread_mutex_unlock(&g_RobotMutexArr[0]); */
+    pthread_mutex_unlock(&g_RobotMutexArr[0]);
     pthread_cond_signal(&g_RobotEvtArr[0]);
 
     pthread_mutex_lock(&g_RobotMutexArr[1]);
     g_RobotOnOffArr[1] = tRes_1;
-    /* pthread_mutex_unlock(&g_RobotMutexArr[1]); */
+    pthread_mutex_unlock(&g_RobotMutexArr[1]);
     pthread_cond_signal(&g_RobotEvtArr[1]);
 
     if (g_SignalVal == -1) {
@@ -130,7 +130,7 @@ int main() {
     switch (choice) {
     case -1: {
       // Part (c)(iii) – To be completed.
-      printf("Locking cmmutex for updating choice")
+      printf("Locking cmmutex for updating choice");
       pthread_mutex_lock(&g_CMMutex);
       g_SignalVal = choice;
       pthread_mutex_unlock(&g_CMMutex);
